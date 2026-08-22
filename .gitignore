@@ -1,0 +1,13 @@
+.env
+.venv
+venv
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+backend/progress_tracker.db
+backend/test.db
+frontend/node_modules/
+frontend/dist/
+*.egg-info/
+.DS_Store
