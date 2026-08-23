@@ -13,6 +13,8 @@ engine_kwargs: dict = {"echo": False}
 if settings.database_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
     engine_kwargs["poolclass"] = StaticPool
+else:
+    connect_args = {"statement_cache_size": 0}
 
 engine = create_async_engine(settings.database_url, connect_args=connect_args, **engine_kwargs)
 
