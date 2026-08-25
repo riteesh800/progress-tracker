@@ -1,13 +1,52 @@
+# Environment files and secrets
 .env
-.venv
-venv
+.env.*
+*.env
+!.env.example
+
+# Python & Virtual Environments
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Testing & Linting caches
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Databases & SQLite files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 backend/progress_tracker.db
 backend/test.db
+
+# Frontend & Node
+node_modules/
 frontend/node_modules/
 frontend/dist/
-*.egg-info/
+frontend/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editor files
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
