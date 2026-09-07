@@ -231,6 +231,7 @@ export default function ImportPage() {
   const [statusMsg, setStatusMsg] = useState("");
   const [skillName, setSkillName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!jobId) return;
@@ -305,15 +306,25 @@ export default function ImportPage() {
           {error && <p className="error">{error}</p>}
           {job?.status === "failed" && <p className="error">{job.error_message}</p>}
           {job?.status === "ready_for_preview" && tree && (
-            <div className="card grid">
-              <h3>Preview editor</h3>
-              <p className="muted">Low-confidence nodes are outlined. Nothing is saved until you confirm.</p>
+            <div className="card grid import-preview-card">
+              <div className="import-preview-header">
+                <div>
+                  <h3>Preview editor</h3>
+                  <p className="muted">Low-confidence nodes are outlined. Nothing is saved until you confirm.</p>
+                </div>
+                <button
+                  className="scroll-end-btn"
+                  onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                >
+                  Scroll to end ↓
+                </button>
+              </div>
               <input placeholder="Skill name" value={skillName} onChange={(e) => setSkillName(e.target.value)} />
               <PreviewNode
                 node={tree}
                 onChange={(n) => setJob({ ...job, generated_tree_json: n })}
               />
-              <div className="row">
+              <div className="row" ref={bottomRef}>
                 <button onClick={saveTree}>Save edits</button>
                 <button className="primary" onClick={confirm}>Confirm import</button>
               </div>

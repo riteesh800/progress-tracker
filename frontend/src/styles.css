@@ -20,9 +20,13 @@ button, input, textarea, select {
   font: inherit; border-radius: 10px; border: 1px solid var(--line);
   background: #11181f; color: var(--text);
 }
-button { cursor: pointer; padding: 0.45rem 0.8rem; background: #243040; }
+button { cursor: pointer; padding: 0.45rem 0.8rem; background: #243040; transition: background 0.2s, transform 0.15s, box-shadow 0.2s; }
+button:hover:not(:disabled) { background: #2e3f54; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+button:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
 button.primary { background: #134e4a; border-color: var(--accent); color: var(--accent); }
+button.primary:hover:not(:disabled) { background: #1a6b64; box-shadow: 0 2px 12px rgba(94,234,212,0.2); }
 button.danger { background: #3f1d24; border-color: var(--danger); color: var(--danger); }
+button.danger:hover:not(:disabled) { background: #5c2832; box-shadow: 0 2px 12px rgba(251,113,133,0.2); }
 input, textarea, select { padding: 0.5rem 0.7rem; width: 100%; }
 input[type="checkbox"] {
   width: 0.95rem;
@@ -167,6 +171,7 @@ input[type="checkbox"] {
   line-height: 1.2;
   border-radius: 7px;
 }
+.btn-notes:hover { background: #2e3f54; }
 .line-bar {
   display: flex;
   align-items: center;
@@ -202,12 +207,14 @@ input[type="checkbox"] {
   place-items: center;
   border-radius: 7px;
 }
+.icon-btn:hover { background: #2e3f54; transform: scale(1.15); }
 .icon-btn.plus {
   background: #134e4a;
   border-color: var(--accent);
   color: var(--accent);
   font-size: 0.95rem;
 }
+.icon-btn.plus:hover { background: #1a6b64; }
 .add-child { margin-top: 0.4rem; }
 .streak-stats {
   display: flex;
@@ -846,4 +853,27 @@ button:disabled {
 .tz-select select { height: 10.5rem; }
 @media (max-width: 800px) {
   .makenote-page { grid-template-columns: 1fr; min-height: 0; }
+}
+
+/* Import preview scroll-to-end button */
+.import-preview-card { position: relative; }
+.import-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.scroll-end-btn {
+  white-space: nowrap;
+  background: #134e4a;
+  border-color: var(--accent);
+  color: var(--accent);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+.scroll-end-btn:hover {
+  background: #1a6b64;
+  transform: translateY(2px);
 }
