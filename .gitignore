@@ -50,3 +50,6 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+progress_tracker_md_corrections.md
+skill_progress_tracker_build_spec.md
