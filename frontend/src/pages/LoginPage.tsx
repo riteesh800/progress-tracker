@@ -59,7 +59,8 @@ export default function LoginPage() {
       } else {
         await resetPassword(email, code, password);
         await login(email, password);
-        nav("/");
+        const afterReset = await me();
+        nav(afterReset.must_change_password ? "/change-password" : "/");
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");

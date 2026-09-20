@@ -39,13 +39,25 @@ async def get_current_user(
     if payload.get("type") != "access":
         raise AppError(401, "invalid_token", "Invalid access token.")
     user_id = payload.get("sub")
-    result = await session.execute(select(User).where(User.id == UUID(user_id)))
+    try:
+        uid = UUID(str(user_id))
+    except (TypeError, ValueError):
+        raise AppError(401, "invalid_token", "Invalid access token.")
+    result = await session.execute(select(User).where(User.id == uid))
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise AppError(401, "unauthenticated", "User not found or inactive.")
-    if user.must_change_password and (request.method, request.url.path) not in _PASSWORD_CHANGE_ALLOWED:
+    if user.must_change_password and not _password_change_allowed(request):
         raise AppError(403, "password_change_required", "You must set a new password before continuing.")
     return user
+
+
+def _password_change_allowed(request: Request) -> bool:
+    path = (request.url.path or "").rstrip("/")
+    return (request.method, path) in _PASSWORD_CHANGE_ALLOWED or (
+        (request.method == "GET" and path.endswith("/auth/me"))
+        or (request.method == "POST" and path.endswith("/auth/change-password"))
+    )
 
 
 def serialize_user(user: User) -> UserOut:

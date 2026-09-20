@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, serialize_user
@@ -79,7 +80,11 @@ async def register(request: Request, body: RegisterIn, session: AsyncSession = D
         timezone=body.timezone or "UTC",
     )
     session.add(user)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise AppError(409, "email_taken", "An account with this email already exists.")
     tokens = await _issue_tokens(session, user)
     return tokens
 
@@ -162,7 +167,11 @@ async def google_login(request: Request, body: GoogleIn, session: AsyncSession =
             timezone=body.timezone or "UTC",
         )
         session.add(user)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            raise AppError(409, "email_taken", "An account with this email already exists.")
     return await _issue_tokens(session, user)
 
 
@@ -184,6 +193,8 @@ def _verify_google(id_token: str) -> tuple[str, str, str]:
         )
     except Exception:
         logger.info("Auth failure: invalid Google ID token")
+        raise AppError(401, "invalid_google_token", "Google token could not be verified.")
+    if info.get("email_verified") is False:
         raise AppError(401, "invalid_google_token", "Google token could not be verified.")
     return info["email"], info["sub"], info.get("name") or ""
 
@@ -252,6 +263,7 @@ async def reset_password(request: Request, body: ResetPasswordIn, session: Async
     row = await _unused_reset_row(session, user, body.code)
     row.used = True
     user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
     await session.execute(update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True))
     await session.commit()
     return {"ok": True}
@@ -263,6 +275,8 @@ async def change_password(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
+    if not user.must_change_password:
+        raise AppError(403, "not_required", "Password change is only required after an admin reset.")
     if user.password_hash and verify_password(body.new_password, user.password_hash):
         raise AppError(400, "password_reused", "Choose a different password from the one you just used.")
     user.password_hash = hash_password(body.new_password)

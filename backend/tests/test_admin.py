@@ -161,6 +161,21 @@ async def test_admin_password_forces_user_reset(client):
     ] is False
 
 
+async def test_change_password_rejected_without_admin_flag(client):
+    access, _ = await register(client, "normalpw@example.com", password="keep-pass1")
+    blocked = await client.post(
+        "/auth/change-password",
+        json={"new_password": "other-pass1"},
+        headers=auth_header(access),
+    )
+    assert blocked.status_code == 403
+    still = await client.post(
+        "/auth/login",
+        json={"email": "normalpw@example.com", "password": "keep-pass1"},
+    )
+    assert still.status_code == 200
+
+
 async def test_deleted_account_disappears_from_admin_list(client):
     admin_access, _ = await register(client, ADMIN_EMAIL)
     gone_access, _ = await register(client, "gone@example.com")

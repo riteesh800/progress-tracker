@@ -21,5 +21,5 @@ def verify_admin_access_code(provided: str) -> bool:
         return False
     try:
         return hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
-    except TypeError:
+    except (TypeError, ValueError):
         return False
