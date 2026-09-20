@@ -635,21 +635,40 @@ input[type="checkbox"] {
   font-size: 0.98rem;
 }
 .import-guide-block p { margin: 0.35rem 0; }
-.import-prompt {
+.import-prompt-box {
   margin: 0.55rem 0 0;
-  padding: 0.85rem 0.95rem;
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   background: #121820;
-  border-radius: 0 10px 10px 0;
-  color: var(--text);
-  font-size: 0.9rem;
-  line-height: 1.45;
+  overflow: hidden;
 }
-.import-prompt pre {
-  margin: 0.65rem 0;
+.import-prompt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+.import-copy-btn {
+  padding: 0.22rem 0.65rem;
+  font-size: 0.8rem;
+  background: #134e4a;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.import-copy-btn:hover:not(:disabled) {
+  background: #1a6b64;
+}
+.import-prompt {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  color: var(--text);
   font-family: ui-monospace, Consolas, monospace;
   font-size: 0.85rem;
-  color: var(--muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow: auto;
 }
 .import-good-sample {
   margin: 0.55rem 0 0;

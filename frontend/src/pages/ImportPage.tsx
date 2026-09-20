@@ -153,6 +153,53 @@ function UploadCard({
   );
 }
 
+const EXAMPLE_PROMPT = `Generate a syllabus for [subject] that is [comprehensive / only important concepts] for [interview / quiz / A-to-Z knowledge] using the following hierarchical structure:
+
+1
+1.1
+1.2
+1.2.1
+1.2.2
+2
+2.1
+3
+
+Organize the content as topics, subtopics, and sub-subtopics using this numbering structure.`;
+
+function CopyablePrompt({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <div className="import-prompt-box">
+      <div className="import-prompt-toolbar">
+        <span className="muted">Example prompt</span>
+        <button type="button" className="import-copy-btn" onClick={copy}>
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre className="import-prompt">{text}</pre>
+    </div>
+  );
+}
+
 function PdfGuide() {
   return (
     <section className="import-guide">
@@ -167,23 +214,7 @@ function PdfGuide() {
             </a>{" "}
             or any other AI tool.
           </p>
-          <p>Example prompt:</p>
-          <blockquote className="import-prompt">
-            Generate a syllabus for <strong>[subject]</strong> that is{" "}
-            <strong>[comprehensive / only important concepts]</strong> for{" "}
-            <strong>[interview / quiz / A-to-Z knowledge]</strong> using the following hierarchical
-            structure:
-            <pre>{`1
-1.1
-1.2
-1.2.1
-1.2.2
-2
-2.1
-3`}</pre>
-            Organize the content as topics, subtopics, and sub-subtopics using this numbering
-            structure.
-          </blockquote>
+          <CopyablePrompt text={EXAMPLE_PROMPT} />
         </div>
 
         <div className="import-guide-block">
