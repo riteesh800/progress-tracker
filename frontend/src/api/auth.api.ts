@@ -1,7 +1,14 @@
 import { api, setTokens, clearTokens, getRefresh } from "./client";
 
 export type TokenPair = { access_token: string; refresh_token: string; token_type: string };
-export type User = { id: string; email: string; name: string; timezone: string; is_active: boolean };
+export type User = {
+  id: string;
+  email: string;
+  name: string;
+  timezone: string;
+  is_active: boolean;
+  can_open_admin?: boolean;
+};
 
 export async function register(body: { email: string; password: string; name: string; timezone: string }) {
   const tokens = await api<TokenPair>("/auth/register", { method: "POST", body: JSON.stringify(body), auth: false });

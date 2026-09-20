@@ -65,8 +65,30 @@ class UserOut(BaseModel):
     name: str
     timezone: str
     is_active: bool
+    can_open_admin: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class AdminUnlockIn(BaseModel):
+    access_code: str = Field(min_length=1, max_length=128)
+
+
+class AdminUnlockOut(BaseModel):
+    admin_token: str
+    expires_in: int
+
+
+class AdminUserOut(BaseModel):
+    id: UUID
+    name: str
+    email: EmailStr
+
+    model_config = {"from_attributes": True}
+
+
+class AdminPasswordIn(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class UserUpdateIn(BaseModel):

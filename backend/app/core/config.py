@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     max_pdf_bytes: int = 10 * 1024 * 1024
     max_pdf_pages: int = 200
+    admin_email: str = "riteeritee251@gmail.com"
+    # Server-only secret (Render env). Never expose to the frontend.
+    admin_access_code: str = ""
+    admin_session_expire_minutes: int = 30
 
     @property
     def cors_origin_list(self) -> list[str]:

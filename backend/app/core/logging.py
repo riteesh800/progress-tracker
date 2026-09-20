@@ -3,7 +3,17 @@ from __future__ import annotations
 import logging
 import sys
 
-SENSITIVE_KEYS = {"password", "token", "secret", "authorization", "api_key", "refresh_token"}
+SENSITIVE_KEYS = {
+    "password",
+    "token",
+    "secret",
+    "authorization",
+    "api_key",
+    "refresh_token",
+    "access_code",
+    "admin_access_code",
+    "new_password",
+}
 
 
 def get_logger(name: str) -> logging.Logger:

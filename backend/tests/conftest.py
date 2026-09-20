@@ -7,6 +7,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("JWT_SECRET", "test-access-secret")
 os.environ.setdefault("JWT_REFRESH_SECRET", "test-refresh-secret")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
+os.environ.setdefault("ADMIN_ACCESS_CODE", "test-admin-access-ok")
 
 import pytest
 from httpx import ASGITransport, AsyncClient

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user, get_db, serialize_user
 from app.core.config import settings
 from app.core.exceptions import AppError
 from app.core.logging import get_logger
@@ -258,7 +258,7 @@ async def reset_password(request: Request, body: ResetPasswordIn, session: Async
 
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
-    return user
+    return serialize_user(user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -273,7 +273,7 @@ async def update_me(
         user.timezone = body.timezone
     await session.commit()
     await session.refresh(user)
-    return user
+    return serialize_user(user)
 
 
 @router.delete("/me")

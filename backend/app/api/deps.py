@@ -6,10 +6,12 @@ from fastapi import Depends, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.admin import is_admin_email
 from app.core.exceptions import AppError
 from app.core.security import decode_access_token
 from app.db.session import get_session
 from app.models import Skill, Topic, User
+from app.schemas import UserOut
 import jwt
 
 
@@ -37,6 +39,40 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise AppError(401, "unauthenticated", "User not found or inactive.")
+    return user
+
+
+def serialize_user(user: User) -> UserOut:
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        timezone=user.timezone,
+        is_active=user.is_active,
+        can_open_admin=is_admin_email(user.email),
+    )
+
+
+async def require_admin_account(user: User = Depends(get_current_user)) -> User:
+    if not is_admin_email(user.email):
+        raise AppError(403, "forbidden", "Admin is not available for this account.")
+    return user
+
+
+async def get_verified_admin(
+    x_admin_session: str | None = Header(default=None, alias="X-Admin-Session"),
+    user: User = Depends(require_admin_account),
+) -> User:
+    if not x_admin_session:
+        raise AppError(401, "admin_locked", "Database Access Code verification is required.")
+    try:
+        payload = decode_access_token(x_admin_session)
+    except jwt.ExpiredSignatureError:
+        raise AppError(401, "admin_locked", "Admin session expired. Enter the Database Access Code again.")
+    except jwt.InvalidTokenError:
+        raise AppError(401, "admin_locked", "Admin session is invalid.")
+    if payload.get("type") != "admin" or str(payload.get("sub")) != str(user.id):
+        raise AppError(401, "admin_locked", "Admin session is invalid.")
     return user
 
 

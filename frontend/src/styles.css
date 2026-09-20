@@ -950,6 +950,33 @@ button:disabled {
 .tz-steppers button { padding: 0.15rem 0.4rem; line-height: 1; }
 .tz-selected { font-size: 0.78rem; }
 .tz-select select { height: 10.5rem; }
+.admin-unlock { display: grid; gap: 0.75rem; max-width: 420px; }
+.admin-table-wrap { padding: 0; overflow: auto; }
+.admin-table-head,
+.admin-table-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 1.4fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.7rem 1rem;
+}
+.admin-table-head {
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+.admin-table-row {
+  border-bottom: 1px solid var(--line);
+}
+.admin-table-row:last-child { border-bottom: 0; }
+.admin-table-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-pw-card { display: grid; gap: 0.7rem; max-width: 480px; }
+.admin-pw-card h2 { margin: 0; }
 @media (max-width: 800px) {
   .makenote-page { grid-template-columns: 1fr; min-height: 0; }
 }

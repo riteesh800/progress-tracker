@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { me, logout } from "./api/auth.api";
 import { getAccess } from "./api/client";
 import { onWaking } from "./api/client";
+import { clearAdminToken } from "./api/admin.api";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import SkillsPage from "./pages/SkillsPage";
@@ -11,6 +12,7 @@ import SkillDetailPage from "./pages/SkillDetailPage";
 import ImportPage from "./pages/ImportPage";
 import SearchPage from "./pages/SearchPage";
 import SettingsPage from "./pages/SettingsPage";
+import AdminPage from "./pages/AdminPage";
 import StreakPage from "./pages/StreakPage";
 import ActivityPage from "./pages/ActivityPage";
 import MakeNotePage from "./pages/MakeNotePage";
@@ -60,12 +62,19 @@ function Shell({ children }: { children: ReactNode }) {
               <span>{item.label}</span>
             </NavLink>
           ))}
+          {q.data?.can_open_admin && (
+            <NavLink to="/admin" className="nav-item" onClick={() => setOpen(false)}>
+              <Icon d="M12 3 5 6.5v5c0 4.2 2.7 8 7 9 4.3-1 7-4.8 7-9v-5L12 3Zm0 6v4m0 3h.01" />
+              <span>Admin</span>
+            </NavLink>
+          )}
         </nav>
         <div className="sidebar-foot">
           <span className="muted sidebar-email">{q.data?.email}</span>
           <button
             type="button"
             onClick={async () => {
+              clearAdminToken();
               await logout();
               window.location.href = "/login";
             }}
@@ -99,6 +108,7 @@ export default function App() {
       <Route path="/make-note" element={<Shell><MakeNotePage /></Shell>} />
       <Route path="/notes" element={<Navigate to="/make-note" replace />} />
       <Route path="/settings" element={<Shell><SettingsPage /></Shell>} />
+      <Route path="/admin" element={<Shell><AdminPage /></Shell>} />
     </Routes>
   );
 }

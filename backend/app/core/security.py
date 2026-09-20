@@ -24,13 +24,18 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
+def create_access_token(
+    subject: str,
+    extra: dict[str, Any] | None = None,
+    expire_minutes: int | None = None,
+) -> str:
     now = datetime.now(timezone.utc)
+    minutes = expire_minutes if expire_minutes is not None else settings.access_token_expire_minutes
     payload: dict[str, Any] = {
         "sub": subject,
         "type": "access",
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=settings.access_token_expire_minutes)).timestamp()),
+        "exp": int((now + timedelta(minutes=minutes)).timestamp()),
         "jti": str(uuid4()),
     }
     if extra:
