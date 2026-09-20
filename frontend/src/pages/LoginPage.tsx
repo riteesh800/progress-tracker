@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { forgotPassword, login, register, resetPassword, verifyResetCode } from "../api/auth.api";
+import { forgotPassword, login, me, register, resetPassword, verifyResetCode } from "../api/auth.api";
 import { ApiError } from "../api/client";
 import PasswordField from "../components/PasswordField";
 
