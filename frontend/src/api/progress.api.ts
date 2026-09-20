@@ -3,7 +3,7 @@ import { api } from "./client";
 export const getDashboard = () =>
   api<{
     total_skills: number;
-    total_topics: number;
+    total_topics: number; // leaf nodes across all skills
     completed_topics: number;
     overall_progress: number;
     current_streak: number;

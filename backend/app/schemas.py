@@ -251,7 +251,7 @@ class PersonalNoteOut(BaseModel):
 
 class DashboardOut(BaseModel):
     total_skills: int
-    total_topics: int
+    total_topics: int  # leaf-node count across the user's skills
     completed_topics: int
     overall_progress: float
     current_streak: int

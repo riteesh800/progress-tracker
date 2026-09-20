@@ -15,6 +15,7 @@ async def test_dashboard_aggregation_and_suggested_next(client):
     await client.post(f"/topics/{t1['id']}/complete", json={"completed": True}, headers=h)
     dash = (await client.get("/dashboard", headers=h)).json()
     assert dash["total_skills"] == 1
+    assert dash["total_topics"] == 2
     assert dash["completed_topics"] == 1
     assert dash["overall_progress"] == 50.0
     nxt = (await client.get("/dashboard/suggested-next", headers=h)).json()
@@ -22,3 +23,28 @@ async def test_dashboard_aggregation_and_suggested_next(client):
     feed = (await client.get("/activity", headers=h)).json()
     assert any(a["action_type"] == "skill_created" for a in feed)
     assert any(a["action_type"] == "topic_completed" for a in feed)
+
+
+async def test_dashboard_total_topics_counts_leaves_only(client):
+    token, _ = await register(client)
+    h = auth_header(token)
+    skill1 = (await client.post("/skills", json={"name": "Skill 1"}, headers=h)).json()
+    skill2 = (await client.post("/skills", json={"name": "Skill 2"}, headers=h)).json()
+    parent = (
+        await client.post("/topics", json={"skill_id": skill1["id"], "name": "Parent"}, headers=h)
+    ).json()
+    await client.post(
+        "/topics",
+        json={"skill_id": skill1["id"], "parent_id": parent["id"], "name": "Leaf A"},
+        headers=h,
+    )
+    await client.post(
+        "/topics",
+        json={"skill_id": skill1["id"], "parent_id": parent["id"], "name": "Leaf B"},
+        headers=h,
+    )
+    await client.post("/topics", json={"skill_id": skill2["id"], "name": "Leaf C"}, headers=h)
+    dash = (await client.get("/dashboard", headers=h)).json()
+    assert dash["total_skills"] == 2
+    assert dash["total_topics"] == 3
+

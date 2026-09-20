@@ -94,14 +94,6 @@ async def dashboard(
         .where(Skill.user_id == user.id, child.c.id.is_(None))
     )
     leaves = (await session.execute(leaf_q)).all()
-    total_topics = (
-        await session.execute(
-            select(func.count())
-            .select_from(Topic)
-            .join(Skill, Skill.id == Topic.skill_id)
-            .where(Skill.user_id == user.id)
-        )
-    ).scalar_one()
     completed_leaves = sum(1 for _, done in leaves if done)
     total_leaves = len(leaves)
     overall = 0.0 if total_leaves == 0 else round(completed_leaves / total_leaves * 100, 2)
@@ -109,7 +101,7 @@ async def dashboard(
     current, longest = await streak_for_user(session, user.id, today)
     return DashboardOut(
         total_skills=total_skills,
-        total_topics=total_topics,
+        total_topics=total_leaves,  # dashboard "Topics" = leaf nodes only
         completed_topics=completed_leaves,
         overall_progress=overall,
         current_streak=current,
