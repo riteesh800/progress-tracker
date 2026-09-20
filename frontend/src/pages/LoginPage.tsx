@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { forgotPassword, login, me, register, resetPassword, verifyResetCode } from "../api/auth.api";
+import { login, me, register, resetPassword, verifyResetCode } from "../api/auth.api";
 import { ApiError } from "../api/client";
 import PasswordField from "../components/PasswordField";
 
@@ -35,6 +35,7 @@ export default function LoginPage() {
     if (busy) return;
     setError("");
     setInfo("");
+    if (mode === "forgot") return;
     if ((mode === "register" || mode === "reset") && password !== confirm) {
       setError("Passwords do not match.");
       return;
@@ -48,10 +49,6 @@ export default function LoginPage() {
       } else if (mode === "register") {
         await register({ email, password, name, timezone: tz });
         nav("/");
-      } else if (mode === "forgot") {
-        const res = await forgotPassword(email);
-        setInfo(res.message || "Reset code sent to your email.");
-        setMode("verify");
       } else if (mode === "verify") {
         await verifyResetCode(email, code);
         setInfo("Code verified. Choose a new password.");
@@ -86,10 +83,21 @@ export default function LoginPage() {
         <h1>Skill Progress Tracker</h1>
         <p className="muted">Turn a syllabus into a trackable topic tree.</p>
         <form className="card auth-card grid" onSubmit={onSubmit}>
+          {mode === "forgot" && (
+            <p className="auth-forgot-note">
+              This feature is currently unavailable. If you forgot your password, please email your name, your
+              email address, or both to{" "}
+              <a href="mailto:riteeritee251@gmail.com">riteeritee251@gmail.com</a>. You will receive a new
+              password. You can then log in and change the password the admin sent you. Sorry for the
+              inconvenience.
+            </p>
+          )}
+          {mode !== "forgot" && (
           <label>
             Email
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" />
           </label>
+          )}
           {mode === "register" && (
             <label>
               Name
@@ -126,9 +134,11 @@ export default function LoginPage() {
           )}
           {error && <div className="error">{error}</div>}
           {info && <div className="settings-ok">{info}</div>}
+          {mode !== "forgot" && (
           <button className={`primary auth-submit${busy ? " is-busy" : ""}`} type="submit" disabled={busy}>
             {busy ? "Please wait…" : submitLabel}
           </button>
+          )}
           {mode === "register" && <div className="muted">Timezone captured at signup: {tz}</div>}
           <div className="row auth-switch">
             <button type="button" onClick={() => switchMode("login")}>Log in</button>
