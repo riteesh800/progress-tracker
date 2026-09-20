@@ -59,6 +59,10 @@ class ResetPasswordIn(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class ForcedPasswordIn(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class UserOut(BaseModel):
     id: UUID
     email: EmailStr
@@ -66,6 +70,7 @@ class UserOut(BaseModel):
     timezone: str
     is_active: bool
     can_open_admin: bool = False
+    must_change_password: bool = False
 
     model_config = {"from_attributes": True}
 

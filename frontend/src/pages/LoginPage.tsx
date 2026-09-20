@@ -43,7 +43,8 @@ export default function LoginPage() {
     try {
       if (mode === "login") {
         await login(email, password);
-        nav("/");
+        const u = await me();
+        nav(u.must_change_password ? "/change-password" : "/");
       } else if (mode === "register") {
         await register({ email, password, name, timezone: tz });
         nav("/");

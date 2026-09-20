@@ -22,6 +22,7 @@ from app.core.security import (
 )
 from app.models import PasswordResetToken, RefreshToken, User
 from app.schemas import (
+    ForcedPasswordIn,
     ForgotPasswordIn,
     GoogleIn,
     LoginIn,
@@ -254,6 +255,21 @@ async def reset_password(request: Request, body: ResetPasswordIn, session: Async
     await session.execute(update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True))
     await session.commit()
     return {"ok": True}
+
+
+@router.post("/change-password", response_model=UserOut)
+async def change_password(
+    body: ForcedPasswordIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    if user.password_hash and verify_password(body.new_password, user.password_hash):
+        raise AppError(400, "password_reused", "Choose a different password from the one you just used.")
+    user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
+    await session.commit()
+    await session.refresh(user)
+    return serialize_user(user)
 
 
 @router.get("/me", response_model=UserOut)

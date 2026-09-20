@@ -72,6 +72,7 @@ class User(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     skills: Mapped[list["Skill"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True

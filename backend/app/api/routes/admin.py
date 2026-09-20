@@ -60,6 +60,7 @@ async def admin_set_password(
     if target is None:
         raise AppError(404, "not_found", "User not found.")
     target.password_hash = hash_password(body.new_password)
+    target.must_change_password = True
     await session.execute(update(RefreshToken).where(RefreshToken.user_id == target.id).values(revoked=True))
     await session.commit()
     return {"ok": True}

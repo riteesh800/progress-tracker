@@ -119,6 +119,11 @@ def create_app() -> FastAPI:
                         sync_conn.exec_driver_sql("ALTER TABLE activity_log ADD COLUMN parent_name_snapshot TEXT")
                     if "summary" not in names:
                         sync_conn.exec_driver_sql("ALTER TABLE activity_log ADD COLUMN summary TEXT")
+                    user_cols = {row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(users)").fetchall()}
+                    if "must_change_password" not in user_cols:
+                        sync_conn.exec_driver_sql(
+                            "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0"
+                        )
 
                 await conn.run_sync(_sqlite_columns)
         logger.info("Skill Progress Tracker API started")

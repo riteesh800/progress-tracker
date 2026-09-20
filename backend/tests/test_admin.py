@@ -111,8 +111,54 @@ async def test_admin_change_password_only_affects_target(client):
     still_b2 = await client.post("/auth/login", json={"email": "userb@example.com", "password": "bravo-pass"})
     assert still_b2.status_code == 200
 
-    # unused token for user_a original session after reset
-    _ = user_a, user_b
+
+async def test_admin_password_forces_user_reset(client):
+    admin_access, _ = await register(client, ADMIN_EMAIL)
+    await register(client, "usera@example.com", password="alpha-pass")
+    unlocked = await client.post(
+        "/admin/unlock",
+        json={"access_code": ADMIN_CODE},
+        headers=auth_header(admin_access),
+    )
+    admin_token = unlocked.json()["admin_token"]
+    users = (
+        await client.get("/admin/users", headers=_admin_headers(admin_access, admin_token))
+    ).json()
+    a_id = next(u["id"] for u in users if u["email"] == "usera@example.com")
+    await client.post(
+        f"/admin/users/{a_id}/password",
+        json={"new_password": "temp-pass1"},
+        headers=_admin_headers(admin_access, admin_token),
+    )
+    login = await client.post("/auth/login", json={"email": "usera@example.com", "password": "temp-pass1"})
+    assert login.status_code == 200
+    token = login.json()["access_token"]
+    me = (await client.get("/auth/me", headers=auth_header(token))).json()
+    assert me["must_change_password"] is True
+    blocked = await client.get("/skills", headers=auth_header(token))
+    assert blocked.status_code == 403
+    reused = await client.post(
+        "/auth/change-password",
+        json={"new_password": "temp-pass1"},
+        headers=auth_header(token),
+    )
+    assert reused.status_code == 400
+    changed = await client.post(
+        "/auth/change-password",
+        json={"new_password": "own-pass12"},
+        headers=auth_header(token),
+    )
+    assert changed.status_code == 200
+    assert changed.json()["must_change_password"] is False
+    skills = await client.get("/skills", headers=auth_header(token))
+    assert skills.status_code == 200
+    old_temp = await client.post("/auth/login", json={"email": "usera@example.com", "password": "temp-pass1"})
+    assert old_temp.status_code == 401
+    own = await client.post("/auth/login", json={"email": "usera@example.com", "password": "own-pass12"})
+    assert own.status_code == 200
+    assert (await client.get("/auth/me", headers=auth_header(own.json()["access_token"]))).json()[
+        "must_change_password"
+    ] is False
 
 
 async def test_deleted_account_disappears_from_admin_list(client):

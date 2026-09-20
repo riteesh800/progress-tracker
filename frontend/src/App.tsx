@@ -5,7 +5,7 @@ import { me, logout } from "./api/auth.api";
 import { getAccess } from "./api/client";
 import { onWaking } from "./api/client";
 import { clearAdminToken } from "./api/admin.api";
-import LoginPage from "./pages/LoginPage";
+import ForceChangePasswordPage from "./pages/ForceChangePasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import SkillsPage from "./pages/SkillsPage";
 import SkillDetailPage from "./pages/SkillDetailPage";
@@ -44,6 +44,8 @@ function Shell({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [location.pathname]);
   const q = useQuery({ queryKey: ["me"], queryFn: me, enabled: Boolean(getAccess()), retry: false });
   if (!getAccess()) return <Navigate to="/login" replace />;
+  if (q.isLoading) return <p>Loading…</p>;
+  if (q.data?.must_change_password) return <Navigate to="/change-password" replace />;
 
   return (
     <div className={`layout${open ? " nav-open" : ""}`}>
@@ -97,6 +99,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/change-password" element={<ForceChangePasswordPage />} />
       <Route path="/" element={<Shell><DashboardPage /></Shell>} />
       <Route path="/skills" element={<Shell><SkillsPage /></Shell>} />
       <Route path="/skills/:id" element={<Shell><SkillDetailPage /></Shell>} />

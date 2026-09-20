@@ -8,6 +8,7 @@ export type User = {
   timezone: string;
   is_active: boolean;
   can_open_admin?: boolean;
+  must_change_password?: boolean;
 };
 
 export async function register(body: { email: string; password: string; name: string; timezone: string }) {
@@ -69,6 +70,12 @@ export async function resetPassword(email: string, code: string, new_password: s
     method: "POST",
     body: JSON.stringify({ email, code, new_password }),
     auth: false,
+  });
+}
+export async function changeOwnPassword(new_password: string) {
+  return api<User>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ new_password }),
   });
 }
 export async function deleteAccount() {

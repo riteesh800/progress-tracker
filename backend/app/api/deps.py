@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,11 @@ async def get_db(session: AsyncSession = Depends(get_session)) -> AsyncSession:
     return session
 
 
+_PASSWORD_CHANGE_ALLOWED = {("GET", "/auth/me"), ("POST", "/auth/change-password")}
+
+
 async def get_current_user(
+    request: Request,
     authorization: str | None = Header(default=None),
     session: AsyncSession = Depends(get_db),
 ) -> User:
@@ -39,6 +43,8 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise AppError(401, "unauthenticated", "User not found or inactive.")
+    if user.must_change_password and (request.method, request.url.path) not in _PASSWORD_CHANGE_ALLOWED:
+        raise AppError(403, "password_change_required", "You must set a new password before continuing.")
     return user
 
 
@@ -50,6 +56,7 @@ def serialize_user(user: User) -> UserOut:
         timezone=user.timezone,
         is_active=user.is_active,
         can_open_admin=is_admin_email(user.email),
+        must_change_password=user.must_change_password,
     )
 
 
