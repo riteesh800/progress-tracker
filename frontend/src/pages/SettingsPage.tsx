@@ -106,6 +106,10 @@ export default function SettingsPage() {
   const user = profile.data;
   const d = dash.data;
   const skills = skillsQ.data ?? [];
+  const totalTopics =
+    skillsQ.data != null
+      ? skills.reduce((n, s) => n + s.total_leaves, 0)
+      : (d?.total_topics ?? 0);
 
   async function onSaveName(e: FormEvent) {
     e.preventDefault();
@@ -232,7 +236,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="settings-stat">
                   <div className="muted">Total topics</div>
-                  <div>{d.total_topics}</div>
+                  <div>{totalTopics}</div>
                 </div>
                 <div className="settings-stat">
                   <div className="muted">Completed leaves</div>
