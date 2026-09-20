@@ -5,6 +5,7 @@ import { me, logout } from "./api/auth.api";
 import { getAccess } from "./api/client";
 import { onWaking } from "./api/client";
 import { clearAdminToken } from "./api/admin.api";
+import LoginPage from "./pages/LoginPage";
 import ForceChangePasswordPage from "./pages/ForceChangePasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import SkillsPage from "./pages/SkillsPage";
