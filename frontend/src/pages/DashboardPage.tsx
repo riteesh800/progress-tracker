@@ -46,28 +46,44 @@ export default function DashboardPage() {
             <p className="muted dash-progress-caption">{d.completed_topics} completed leaf topics</p>
           </div>
           <div className="dash-stats">
-            <div className="card dash-stat-card">
+            <div
+              className="card dash-stat-card"
+              onContextMenu={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <div className="dash-stat-label">
                 <span className="dash-stat-emoji" aria-hidden>👥</span>
                 <span className="muted">Skills</span>
               </div>
               <div className="dash-stat">{d.total_skills}</div>
             </div>
-            <div className="card dash-stat-card">
+            <div
+              className="card dash-stat-card"
+              onContextMenu={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <div className="dash-stat-label">
                 <span className="dash-stat-emoji" aria-hidden>📚</span>
                 <span className="muted">Topics</span>
               </div>
               <div className="dash-stat">{d.total_topics}</div>
             </div>
-            <div className="card dash-stat-card">
+            <div
+              className="card dash-stat-card"
+              onContextMenu={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <div className="dash-stat-label">
                 <span className="dash-stat-emoji" aria-hidden>✅</span>
                 <span className="muted">Completed leaves</span>
               </div>
               <div className="dash-stat">{d.completed_topics}</div>
             </div>
-            <div className="card dash-stat-card">
+            <div
+              className="card dash-stat-card"
+              onContextMenu={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <div className="dash-stat-label">
                 <span className="dash-stat-emoji" aria-hidden>🔥</span>
                 <span className="muted">Streak</span>
