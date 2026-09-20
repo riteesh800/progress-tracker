@@ -153,7 +153,7 @@ function UploadCard({
   );
 }
 
-const EXAMPLE_PROMPT = `Generate a syllabus for [subject] that is [comprehensive / only important concepts] for [interview / quiz / A-to-Z knowledge] using the following hierarchical structure:
+const PDF_GUIDE_TEXT = `Generate a syllabus for [subject] that is [comprehensive / only important concepts] for [interview / quiz / A-to-Z knowledge] using the following hierarchical structure:
 
 1
 1.1
@@ -164,7 +164,32 @@ const EXAMPLE_PROMPT = `Generate a syllabus for [subject] that is [comprehensive
 2.1
 3
 
-Organize the content as topics, subtopics, and sub-subtopics using this numbering structure.`;
+Organize the content as topics, subtopics, and sub-subtopics using this numbering structure.
+
+Good PDF structure
+Best results come from a clean, text-based PDF with a numbered topic hierarchy like 1 → 1.1 → 1.2 → 1.2.1.
+
+1 Introduction
+1.1 Definition
+1.2 Types
+1.2.1 Type A
+1.2.2 Type B
+
+2 Core Concepts
+2.1 Concept A
+2.2 Concept B
+
+3 Advanced Topics
+3.1 Topic A
+
+Avoid
+- Extra explanations before or after the syllabus
+- Random/unstructured text
+- Emojis
+- Decorative lines
+- Paragraphs mixed into the hierarchy
+- Images instead of text
+- Non-numbered structures when a hierarchy is intended`;
 
 function CopyablePrompt({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -214,40 +239,7 @@ function PdfGuide() {
             </a>{" "}
             or any other AI tool.
           </p>
-          <CopyablePrompt text={EXAMPLE_PROMPT} />
-        </div>
-
-        <div className="import-guide-block">
-          <h3>Good PDF structure</h3>
-          <p className="muted">
-            Best results come from a clean, text-based PDF with a numbered topic hierarchy like{" "}
-            <code>1 → 1.1 → 1.2 → 1.2.1</code>.
-          </p>
-          <pre className="import-good-sample">{`1 Introduction
-1.1 Definition
-1.2 Types
-1.2.1 Type A
-1.2.2 Type B
-
-2 Core Concepts
-2.1 Concept A
-2.2 Concept B
-
-3 Advanced Topics
-3.1 Topic A`}</pre>
-        </div>
-
-        <div className="import-guide-block">
-          <h3>Avoid</h3>
-          <ul className="import-avoid-list">
-            <li>Extra explanations before or after the syllabus</li>
-            <li>Random/unstructured text</li>
-            <li>Emojis</li>
-            <li>Decorative lines</li>
-            <li>Paragraphs mixed into the hierarchy</li>
-            <li>Images instead of text</li>
-            <li>Non-numbered structures when a hierarchy is intended</li>
-          </ul>
+          <CopyablePrompt text={PDF_GUIDE_TEXT} />
         </div>
       </div>
     </section>
