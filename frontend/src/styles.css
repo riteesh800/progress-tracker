@@ -735,22 +735,65 @@ button:disabled {
   display: grid;
   justify-items: center;
   align-content: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   text-align: center;
   min-height: 100%;
+  position: relative;
+  background:
+    radial-gradient(ellipse 90% 80% at 50% 72%, rgba(94, 234, 212, 0.09), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 80% 12%, rgba(56, 189, 248, 0.06), transparent 50%),
+    var(--card);
 }
 .dash-progress-card h3 {
   margin: 0;
   justify-self: start;
   width: 100%;
   text-align: left;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  color: #c5d4e2;
 }
-.dash-progress-card .donut {
+.dash-progress-caption {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+.progress-ring {
   width: 168px;
   height: 168px;
+  position: relative;
+  display: grid;
+  place-items: center;
 }
-.dash-progress-card .donut::before { inset: 18px; }
-.dash-progress-card .donut span { font-size: 1.05rem; }
+.progress-ring svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.progress-ring-track { stroke: #243040; }
+.progress-ring-arc {
+  transition: stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.progress-ring-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.progress-ring-value {
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+  text-shadow: 0 0 18px rgba(94, 234, 212, 0.22);
+}
+.progress-ring-pct {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-left: 0.12rem;
+  vertical-align: super;
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-ring-arc { transition: none; }
+}
 .dash-stats {
   display: grid;
   grid-template-columns: 1fr;
@@ -806,7 +849,7 @@ button:disabled {
 .dash-emoji { font-size: 1.2rem; margin-bottom: 0.25rem; }
 @media (max-width: 900px) {
   .dash-overview { grid-template-columns: 1fr; }
-  .dash-progress-card .donut {
+  .progress-ring {
     width: 150px;
     height: 150px;
   }

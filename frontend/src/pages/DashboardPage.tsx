@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboard } from "../api/progress.api";
-import Donut from "../components/ProgressVisuals";
+import { OverallProgressRing } from "../components/ProgressVisuals";
 
 const steps = [
   { emoji: "📄", title: "Upload PDF", text: "Import a syllabus and review the generated topic tree." },
@@ -42,8 +42,8 @@ export default function DashboardPage() {
         <section className="dash-overview">
           <div className="card dash-progress-card">
             <h3>Overall progress</h3>
-            <Donut percent={d.overall_progress} label={`${d.overall_progress}%`} />
-            <p className="muted">{d.completed_topics} completed leaf topics</p>
+            <OverallProgressRing percent={d.overall_progress} label={`${d.overall_progress}%`} />
+            <p className="muted dash-progress-caption">{d.completed_topics} completed leaf topics</p>
           </div>
           <div className="dash-stats">
             <div className="card dash-stat-card">
