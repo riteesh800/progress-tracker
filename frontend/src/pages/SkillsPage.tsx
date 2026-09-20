@@ -5,6 +5,7 @@ import { createSkill, deleteSkill, listSkills } from "../api/skills.api";
 import Donut from "../components/ProgressVisuals";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { ApiError } from "../api/client";
+import { uniqueSkillColor } from "../lib/skillColors";
 
 export default function SkillsPage() {
   const qc = useQueryClient();
@@ -48,9 +49,16 @@ export default function SkillsPage() {
         <div className="card">No skills yet — create your first one, or <Link to="/import">upload a syllabus</Link>.</div>
       )}
       <div className="cards">
-        {q.data?.map((s) => (
-          <div className="card" key={s.id}>
-            <Link to={`/skills/${s.id}`}><strong>{s.name}</strong></Link>
+        {q.data?.map((s, i) => (
+          <div className="card skill-card" key={s.id}>
+            <Link
+              className="skill-card-name"
+              to={`/skills/${s.id}`}
+              title={s.name}
+              style={{ color: uniqueSkillColor(i) }}
+            >
+              {s.name}
+            </Link>
             {s.empty ? <p className="muted">No topics yet</p> : (
               <>
                 <Donut percent={s.percent} label={`${s.percent}%`} />

@@ -106,6 +106,22 @@ input[type="checkbox"] {
 .grid { display: grid; gap: 1rem; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; }
+.skill-card { min-width: 0; overflow: hidden; }
+.skill-card-name {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.skill-card-name:hover,
+.skill-card-name:focus-visible {
+  text-decoration: none;
+  filter: brightness(1.18);
+}
 .muted { color: var(--muted); }
 .error { color: var(--danger); }
 .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
