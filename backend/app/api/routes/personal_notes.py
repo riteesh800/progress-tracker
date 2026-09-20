@@ -48,7 +48,7 @@ async def create_personal_note(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    title = (body.title or "Untitled note").strip() or "Untitled note"
+    title = ((body.title or "Untitled note").strip() or "Untitled note")[:35]
     note = PersonalNote(user_id=user.id, title=title)
     session.add(note)
     await session.flush()
@@ -75,7 +75,7 @@ async def patch_personal_note(
 ):
     note = await _owned_note(note_id, user, session)
     if body.title is not None:
-        note.title = body.title.strip() or "Untitled note"
+        note.title = (body.title.strip() or "Untitled note")[:35]
     if body.tasks is not None:
         for task in list(note.tasks):
             await session.delete(task)

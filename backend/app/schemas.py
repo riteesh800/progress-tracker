@@ -253,11 +253,11 @@ class PersonalNoteTaskOut(BaseModel):
 
 
 class PersonalNoteIn(BaseModel):
-    title: str = Field(default="Untitled note", max_length=300)
+    title: str = Field(default="Untitled note", max_length=35)
 
 
 class PersonalNoteUpdateIn(BaseModel):
-    title: Optional[str] = Field(default=None, max_length=300)
+    title: Optional[str] = Field(default=None, max_length=35)
     tasks: Optional[list[PersonalNoteTaskIn]] = None
 
 

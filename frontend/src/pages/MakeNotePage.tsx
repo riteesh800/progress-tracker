@@ -13,7 +13,7 @@ type DraftTask = { content: string; is_completed: boolean };
 
 function toDraft(note: PersonalNote): { title: string; tasks: DraftTask[] } {
   return {
-    title: note.title,
+    title: note.title.slice(0, 35),
     tasks: note.tasks.length
       ? [...note.tasks]
           .sort((a, b) => a.order_index - b.order_index)
@@ -68,7 +68,7 @@ export default function MakeNotePage() {
     setMsg(null);
     try {
       const updated = await patchPersonalNote(id, {
-        title: nextTitle,
+        title: nextTitle.slice(0, 35),
         tasks: nextTasks.map((t) => ({ content: t.content, is_completed: t.is_completed })),
       });
       qc.setQueryData<PersonalNote[]>(["personal-notes"], (prev) => {
@@ -156,8 +156,9 @@ export default function MakeNotePage() {
               Note title
               <input
                 value={title}
+                maxLength={35}
                 onChange={(e) => {
-                  const next = e.target.value;
+                  const next = e.target.value.slice(0, 35);
                   setTitle(next);
                   persistSoon(next, tasksRef.current);
                 }}
