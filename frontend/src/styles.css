@@ -106,7 +106,33 @@ input[type="checkbox"] {
 .grid { display: grid; gap: 1rem; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; }
-.skill-card { min-width: 0; overflow: hidden; }
+.skill-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.skill-card:hover,
+.skill-card:focus-within {
+  border-color: rgba(94, 234, 212, 0.45);
+  background: #1d2732;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.skill-card:hover .skill-card-name,
+.skill-card:focus-within .skill-card-name {
+  filter: brightness(1.18);
+}
+.skill-card-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.skill-card-delete {
+  position: relative;
+  z-index: 2;
+}
 .skill-card-name {
   display: block;
   min-width: 0;
@@ -116,11 +142,6 @@ input[type="checkbox"] {
   white-space: nowrap;
   text-decoration: none;
   letter-spacing: 0.02em;
-}
-.skill-card-name:hover,
-.skill-card-name:focus-visible {
-  text-decoration: none;
-  filter: brightness(1.18);
 }
 .muted { color: var(--muted); }
 .error { color: var(--danger); }

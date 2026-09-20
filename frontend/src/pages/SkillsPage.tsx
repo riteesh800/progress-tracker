@@ -52,20 +52,30 @@ export default function SkillsPage() {
         {q.data?.map((s, i) => (
           <div className="card skill-card" key={s.id}>
             <Link
-              className="skill-card-name"
+              className="skill-card-hit"
               to={`/skills/${s.id}`}
-              title={s.name}
-              style={{ color: uniqueSkillColor(i) }}
-            >
+              aria-label={`Open ${s.name}`}
+            />
+            <span className="skill-card-name" title={s.name} style={{ color: uniqueSkillColor(i) }}>
               {s.name}
-            </Link>
+            </span>
             {s.empty ? <p className="muted">No topics yet</p> : (
               <>
                 <Donut percent={s.percent} label={`${s.percent}%`} />
                 <p className="muted">{s.completed_leaves}/{s.total_leaves}</p>
               </>
             )}
-            <button className="danger" onClick={() => setPendingDelete({ id: s.id, name: s.name })}>Delete</button>
+            <button
+              type="button"
+              className="danger skill-card-delete"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setPendingDelete({ id: s.id, name: s.name });
+              }}
+            >
+              Delete
+            </button>
           </div>
         ))}
       </div>
