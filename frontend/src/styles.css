@@ -739,7 +739,13 @@ input[type="checkbox"] {
   border: 0;
   color: var(--muted);
 }
-.pw-toggle:hover { color: var(--text); }
+.pw-toggle:hover:not(:disabled),
+.pw-toggle:active:not(:disabled) {
+  color: var(--text);
+  background: transparent;
+  transform: translateY(-50%);
+  box-shadow: none;
+}
 .auth-shell {
   min-height: 100vh;
   display: grid;
