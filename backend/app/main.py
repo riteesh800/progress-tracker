@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    application.add_middleware(GZipMiddleware, minimum_size=500)
 
     @application.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError):
@@ -89,9 +91,12 @@ def create_app() -> FastAPI:
             content=error_payload(422, "validation_error", "Invalid request payload."),
         )
 
+    from app.api.routes import admin, auth, dashboard, notes, pdf, personal_notes, search, skills, topics, timer
+
     application.include_router(auth.router)
     application.include_router(admin.router)
     application.include_router(skills.router)
+    application.include_router(timer.router, prefix="/skills", tags=["timer"])
     application.include_router(topics.router)
     application.include_router(notes.router)
     application.include_router(personal_notes.router)
@@ -123,6 +128,18 @@ def create_app() -> FastAPI:
                     if "must_change_password" not in user_cols:
                         sync_conn.exec_driver_sql(
                             "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    if "deletion_requested_at" not in user_cols:
+                        sync_conn.exec_driver_sql(
+                            "ALTER TABLE users ADD COLUMN deletion_requested_at DATETIME"
+                        )
+                    if "deletion_deadline" not in user_cols:
+                        sync_conn.exec_driver_sql(
+                            "ALTER TABLE users ADD COLUMN deletion_deadline DATETIME"
+                        )
+                    if "last_active_at" not in user_cols:
+                        sync_conn.exec_driver_sql(
+                            "ALTER TABLE users ADD COLUMN last_active_at DATETIME"
                         )
 
                 await conn.run_sync(_sqlite_columns)

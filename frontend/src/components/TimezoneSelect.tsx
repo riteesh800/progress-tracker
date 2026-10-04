@@ -39,7 +39,7 @@ export default function TimezoneSelect({
   function step(delta: number) {
     const next = zones[(currentIndex + delta + zones.length) % zones.length];
     onChange(next);
-    setQuery("");
+    setQuery(next);
   }
 
   return (
@@ -60,7 +60,7 @@ export default function TimezoneSelect({
             if (e.key === "Enter" && filtered[0]) {
               e.preventDefault();
               onChange(filtered[0]);
-              setQuery("");
+              setQuery(filtered[0]);
             }
           }}
           placeholder={value || "Search timezone"}
@@ -78,7 +78,15 @@ export default function TimezoneSelect({
         aria-label="Timezone list"
         onChange={(e) => {
           onChange(e.target.value);
-          setQuery("");
+          setQuery(e.target.value);
+        }}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === "OPTION") {
+            const val = (target as HTMLOptionElement).value;
+            onChange(val);
+            setQuery(val);
+          }
         }}
       >
         {(query ? filtered : zones).map((z) => (

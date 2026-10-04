@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,6 +8,8 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile
 from pypdf import PdfReader
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -100,7 +103,7 @@ async def run_parse_job(job_id: UUID, raw: bytes) -> None:
         try:
             job.status = ImportJobStatus.extracting
             await session.commit()
-            text, _pages = _extract_text(raw)
+            text, _pages = await asyncio.to_thread(_extract_text, raw)
             if not text.strip():
                 job.status = ImportJobStatus.failed
                 job.error_message = (
@@ -302,13 +305,22 @@ async def confirm_job(
         raise AppError(409, "not_ready", "Import is not ready to confirm.")
     tree = _sanitize_tree(job.generated_tree_json or {})
     _assert_tree_budget(tree)
+    skill_name = (body.skill_name or tree.get("name") or Path(job.original_filename).stem)[:200]
+    existing = (await session.execute(select(Skill.id).where(Skill.user_id == user.id, Skill.name == skill_name))).scalars().first()
+    if existing:
+        raise AppError(409, "skill_exists", "You already have a skill with this name.")
+        
     skill = Skill(
         user_id=user.id,
-        name=(body.skill_name or tree.get("name") or Path(job.original_filename).stem)[:300],
+        name=skill_name,
         description=body.skill_description,
     )
     session.add(skill)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise AppError(409, "skill_exists", "You already have a skill with this name.")
     _persist_nodes(session, skill, tree.get("children") or [], None)
     job.skill_id = skill.id
     job.status = ImportJobStatus.confirmed

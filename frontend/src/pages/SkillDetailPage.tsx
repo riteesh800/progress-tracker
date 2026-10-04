@@ -5,6 +5,7 @@ import { getSkill } from "../api/skills.api";
 import { createTopic, skillTopics } from "../api/topics.api";
 import Donut from "../components/ProgressVisuals";
 import TopicTree from "../components/TopicTree";
+import SkillTimerCard from "../components/SkillTimerCard";
 
 export default function SkillDetailPage() {
   const { id } = useParams();
@@ -24,22 +25,30 @@ export default function SkillDetailPage() {
     if (!id || !rootName.trim()) return;
     await createTopic({ skill_id: id, name: rootName.trim() });
     setRootName("");
-    qc.invalidateQueries({ queryKey: ["topics", id] });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["topics", id] }),
+      qc.invalidateQueries({ queryKey: ["skill", id] }),
+      qc.invalidateQueries({ queryKey: ["dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["skills"] }),
+    ]);
   }
 
   return (
     <div className="grid">
       <h1>{s.name}</h1>
-      {s.empty ? (
-        <div className="card">
-          No topics yet — upload a syllabus or add manually.
-        </div>
-      ) : (
-        <div className="card">
-          <Donut percent={s.percent} label={`${s.percent}%`} />
-          <p className="muted">{s.completed_leaves}/{s.total_leaves} leaf topics</p>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "stretch" }}>
+        {s.empty ? (
+          <div className="card" style={{ flex: 1, maxWidth: "500px" }}>
+            No topics yet — upload a syllabus or add manually.
+          </div>
+        ) : (
+          <div className="card" style={{ flex: 1, maxWidth: "500px" }}>
+            <Donut percent={s.percent} label={`${s.percent}%`} />
+            <p className="muted">{s.completed_leaves}/{s.total_leaves} leaf topics</p>
+          </div>
+        )}
+        <SkillTimerCard skillId={id!} />
+      </div>
       <form className="row" onSubmit={addRoot}>
         <input placeholder="Add root topic" value={rootName} onChange={(e) => setRootName(e.target.value)} />
         <button className="primary" type="submit">Add topic</button>

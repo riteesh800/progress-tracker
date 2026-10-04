@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import Depends, Header, Request
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin import is_admin_email
@@ -20,6 +21,34 @@ async def get_db(session: AsyncSession = Depends(get_session)) -> AsyncSession:
 
 
 _PASSWORD_CHANGE_ALLOWED = {("GET", "/auth/me"), ("POST", "/auth/change-password")}
+
+# Paths that should NOT count as meaningful user activity
+# (background polling, automated refetches, health checks)
+_NON_ACTIVITY_PATHS = {
+    "/health",
+    "/auth/refresh",
+    "/auth/logout",
+}
+
+
+def _is_meaningful_activity(request: Request) -> bool:
+    """Determine if this request represents meaningful user activity.
+
+    Only explicit user-initiated actions count. Background polling,
+    automatic React Query refetches, and token refresh do not count.
+    """
+    path = (request.url.path or "").rstrip("/")
+
+    # Never count certain endpoints
+    if path in _NON_ACTIVITY_PATHS:
+        return False
+
+    # GET requests to data endpoints are typically background refetches
+    # Only non-GET requests (POST, PATCH, DELETE, PUT) count as meaningful
+    if request.method == "GET":
+        return False
+
+    return True
 
 
 async def get_current_user(
@@ -47,6 +76,28 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise AppError(401, "unauthenticated", "User not found or inactive.")
+
+    # Check if deletion deadline has expired
+    if user.deletion_requested_at is not None and user.deletion_deadline is not None:
+        now = datetime.now(timezone.utc)
+        deadline = user.deletion_deadline
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if now >= deadline:
+            # Permanently delete the expired account
+            uid = user.id
+            await session.execute(delete(User).where(User.id == uid))
+            await session.commit()
+            raise AppError(401, "unauthenticated", "User not found or inactive.")
+
+    # Track meaningful user activity and cancel pending deletion if applicable
+    if _is_meaningful_activity(request):
+        if user.deletion_requested_at is not None:
+            # Cancel pending deletion on meaningful authenticated activity
+            user.deletion_requested_at = None
+            user.deletion_deadline = None
+        user.last_active_at = datetime.now(timezone.utc)
+
     if user.must_change_password and not _password_change_allowed(request):
         raise AppError(403, "password_change_required", "You must set a new password before continuing.")
     return user
@@ -95,10 +146,11 @@ async def get_verified_admin(
     return user
 
 
-async def owned_skill(skill_id: UUID, user: User, session: AsyncSession) -> Skill:
-    result = await session.execute(
-        select(Skill).where(Skill.id == skill_id, Skill.user_id == user.id)
-    )
+async def owned_skill(skill_id: UUID, user: User, session: AsyncSession, allow_deleted: bool = False) -> Skill:
+    stmt = select(Skill).where(Skill.id == skill_id, Skill.user_id == user.id)
+    if not allow_deleted:
+        stmt = stmt.where(Skill.deleted_at.is_(None))
+    result = await session.execute(stmt)
     skill = result.scalar_one_or_none()
     if skill is None:
         raise AppError(404, "not_found", "Skill not found.")
@@ -106,10 +158,12 @@ async def owned_skill(skill_id: UUID, user: User, session: AsyncSession) -> Skil
 
 
 async def owned_topic(topic_id: UUID, user: User, session: AsyncSession) -> Topic:
-    result = await session.execute(select(Topic).where(Topic.id == topic_id))
+    result = await session.execute(
+        select(Topic)
+        .join(Skill, Skill.id == Topic.skill_id)
+        .where(Topic.id == topic_id, Skill.user_id == user.id)
+    )
     topic = result.scalar_one_or_none()
     if topic is None:
         raise AppError(404, "not_found", "Topic not found.")
-    skill = await owned_skill(topic.skill_id, user, session)
-    _ = skill
     return topic

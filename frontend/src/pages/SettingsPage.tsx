@@ -41,17 +41,31 @@ function SkillProgressBars({ skills }: { skills: Skill[] }) {
             <div className="settings-skill-bar-name" title={skill.name}>
               {skill.name}
             </div>
-            <div className="settings-skill-bar-line">
-              <div className="settings-skill-bar-track" aria-hidden>
-                <span style={{ width: `${Math.min(100, pct)}%`, background: color }} />
+            {pct === 100 && skill.total_leaves > 0 ? (
+              <div
+                style={{
+                  color: "#4ade80",
+                  fontWeight: "bold",
+                  fontSize: "0.82rem",
+                  display: "flex",
+                  alignItems: "center"
+                }}
+              >
+                Congratulations! You have completed this skill.
               </div>
-              <div className="settings-skill-bar-meta muted">
-                <span>
-                  {skill.completed_leaves}/{skill.total_leaves}
-                </span>
-                <span>{formatPercent(skill.completed_leaves, skill.total_leaves)}</span>
+            ) : (
+              <div className="settings-skill-bar-line">
+                <div className="settings-skill-bar-track" aria-hidden>
+                  <span style={{ width: `${Math.min(100, pct)}%`, background: color }} />
+                </div>
+                <div className="settings-skill-bar-meta muted">
+                  <span>
+                    {skill.completed_leaves}/{skill.total_leaves}
+                  </span>
+                  <span>{formatPercent(skill.completed_leaves, skill.total_leaves)}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
       })}
@@ -147,7 +161,7 @@ export default function SettingsPage() {
             </div>
             <div className="settings-value-col">
               {!editingName ? (
-                <div className="settings-readonly-row">
+                <div className="settings-email-box" style={{ color: "var(--text)", gap: "0.45rem" }}>
                   <span className="settings-readonly">{user.name || "—"}</span>
                   <button
                     type="button"
@@ -171,6 +185,7 @@ export default function SettingsPage() {
                     placeholder="Display name"
                     autoFocus
                     aria-label="Display name"
+                    maxLength={25}
                   />
                   <div className="settings-edit-actions">
                     <button className="primary" type="submit" disabled={saveName.isPending}>
@@ -295,7 +310,7 @@ export default function SettingsPage() {
             <div className="settings-label-col">
               <div>Delete account</div>
               <div className="muted settings-hint">
-                Immediately and permanently removes your skills, topics, notes, activity, and import history.
+                Request account deletion. You have 3 days to recover by logging in again.
               </div>
             </div>
             <div className="settings-value-col">
@@ -313,7 +328,7 @@ export default function SettingsPage() {
       <ConfirmDialog
         open={accountOpen}
         title="Are you sure you want to delete your account?"
-        body="You will permanently lose your account and all associated data. This action cannot be undone."
+        body="You can recover your account by logging in or using your account within 3 days. After 3 days, your account and all associated data will be permanently deleted and cannot be recovered."
         busy={accountBusy}
         onConfirm={async () => {
           setAccountBusy(true);

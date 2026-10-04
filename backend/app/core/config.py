@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Server-only secret (Render env). Never expose to the frontend.
     admin_access_code: str = ""
     admin_session_expire_minutes: int = 30
+    # Shared secret for cron-triggered cleanup endpoint (Render Cron Job).
+    # Must be at least 32 characters in production.
+    cleanup_secret: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

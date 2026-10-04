@@ -176,7 +176,7 @@ async def test_change_password_rejected_without_admin_flag(client):
     assert still.status_code == 200
 
 
-async def test_deleted_account_disappears_from_admin_list(client):
+async def test_deleted_account_shows_deleted_status_in_admin_list(client):
     admin_access, _ = await register(client, ADMIN_EMAIL)
     gone_access, _ = await register(client, "gone@example.com")
     unlocked = await client.post(
@@ -191,7 +191,10 @@ async def test_deleted_account_disappears_from_admin_list(client):
     assert "gone@example.com" in {u["email"] for u in before}
     deleted = await client.delete("/auth/me", headers=auth_header(gone_access))
     assert deleted.status_code == 200
+    # Account still appears with Deleted status during 72-hour recovery period
     after = (
         await client.get("/admin/users", headers=_admin_headers(admin_access, admin_token))
     ).json()
-    assert "gone@example.com" not in {u["email"] for u in after}
+    gone_user = next(u for u in after if u["email"] == "gone@example.com")
+    assert gone_user["status"] == "Deleted"
+

@@ -18,8 +18,11 @@ from app.models import (  # noqa: F401
     ImportJob,
     Note,
     PasswordResetToken,
+    PersonalNote,
+    PersonalNoteTask,
     RefreshToken,
     Skill,
+    SkillTimer,
     Topic,
     User,
 )

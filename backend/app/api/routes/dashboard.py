@@ -11,7 +11,7 @@ from app.api.deps import get_current_user, get_db
 from app.models import ActivityLog, Skill, Topic, User
 from app.models.enums import ActionType
 from app.schemas import ActivityOut, DashboardOut, StreakCalendarOut, StreakDayOut, StreakOut, SuggestedNextOut
-from app.services.progress import ProgressEngine, load_skill_topics, streak_for_user
+from app.services.progress import ProgressEngine, load_user_topics_grouped, streak_for_user
 
 router = APIRouter(tags=["dashboard"])
 
@@ -49,6 +49,8 @@ async def streak_calendar(
     while cursor <= today:
         days.append(StreakDayOut(date=cursor, count=counts.get(cursor, 0)))
         cursor += timedelta(days=1)
+    # streak_for_user queries ALL completion dates (not just the calendar window)
+    # because the current streak may have started before the 365-day window.
     current, longest = await streak_for_user(session, user.id, today)
     return StreakCalendarOut(
         start=start,
@@ -120,12 +122,13 @@ async def suggested_next(
         select(Skill).where(Skill.user_id == user.id).order_by(Skill.created_at.asc())
     )
     skills = list(result.scalars().all())
+    # Batch-load all topics in one query instead of N+1
+    grouped = await load_user_topics_grouped(session, [s.id for s in skills])
     best_skill = None
     best_pct = 101.0
     first_leaf = None
     for skill in skills:
-        topics = await load_skill_topics(session, skill.id)
-        engine = ProgressEngine(topics)
+        engine = ProgressEngine(grouped.get(skill.id, []))
         completed, total, pct = engine.skill_progress()
         if total == 0 or completed == total:
             continue

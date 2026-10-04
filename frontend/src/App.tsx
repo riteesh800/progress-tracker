@@ -1,22 +1,24 @@
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { me, logout } from "./api/auth.api";
 import { getAccess } from "./api/client";
 import { onWaking } from "./api/client";
 import { clearAdminToken } from "./api/admin.api";
-import LoginPage from "./pages/LoginPage";
-import ForceChangePasswordPage from "./pages/ForceChangePasswordPage";
-import DashboardPage from "./pages/DashboardPage";
-import SkillsPage from "./pages/SkillsPage";
-import SkillDetailPage from "./pages/SkillDetailPage";
-import ImportPage from "./pages/ImportPage";
-import SearchPage from "./pages/SearchPage";
-import SettingsPage from "./pages/SettingsPage";
-import AdminPage from "./pages/AdminPage";
-import StreakPage from "./pages/StreakPage";
-import ActivityPage from "./pages/ActivityPage";
-import MakeNotePage from "./pages/MakeNotePage";
+
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const ForceChangePasswordPage = lazy(() => import("./pages/ForceChangePasswordPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const SkillsPage = lazy(() => import("./pages/SkillsPage"));
+const SkillDetailPage = lazy(() => import("./pages/SkillDetailPage"));
+const ImportPage = lazy(() => import("./pages/ImportPage"));
+const SearchPage = lazy(() => import("./pages/SearchPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+const StreakPage = lazy(() => import("./pages/StreakPage"));
+const ActivityPage = lazy(() => import("./pages/ActivityPage"));
+const MakeNotePage = lazy(() => import("./pages/MakeNotePage"));
+const TrashPage = lazy(() => import("./pages/TrashPage"));
 
 function Icon({ d }: { d: string }) {
   return (
@@ -34,6 +36,7 @@ const links = [
   { to: "/streak", label: "Streak", end: true, d: "M8 20V10m4 10V4m4 16v-6" },
   { to: "/activity", label: "Recent Activity", end: true, d: "M5 6h14M5 12h10M5 18h7" },
   { to: "/make-note", label: "Make Note", end: true, d: "M7 4h8l4 4v12H7V4Zm8 0v4h4M9 12h6M9 16h4" },
+  { to: "/trash", label: "Trash", end: true, d: "M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" },
   { to: "/settings", label: "Settings", end: true, d: "M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Zm8.2-3.1.9-1.6-1.8-3.1-1.9.3a7.6 7.6 0 0 0-1.5-.9l-.3-1.9H10.4l-.3 1.9a7.6 7.6 0 0 0-1.5.9l-1.9-.3-1.8 3.1.9 1.6a7.7 7.7 0 0 0 0 1.8l-.9 1.6 1.8 3.1 1.9-.3c.5.4 1 .7 1.5.9l.3 1.9h3.2l.3-1.9c.5-.2 1-.5 1.5-.9l1.9.3 1.8-3.1-.9-1.6c.1-.6.1-1.2 0-1.8Z" },
 ];
 
@@ -42,7 +45,10 @@ function Shell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => onWaking(setWaking), []);
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => {
+    setOpen(false);
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
   const q = useQuery({ queryKey: ["me"], queryFn: me, enabled: Boolean(getAccess()), retry: false });
   if (!getAccess()) return <Navigate to="/login" replace />;
   if (q.isLoading) return <p>Loading…</p>;
@@ -98,21 +104,24 @@ function Shell({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/change-password" element={<ForceChangePasswordPage />} />
-      <Route path="/" element={<Shell><DashboardPage /></Shell>} />
-      <Route path="/skills" element={<Shell><SkillsPage /></Shell>} />
-      <Route path="/skills/:id" element={<Shell><SkillDetailPage /></Shell>} />
-      <Route path="/import" element={<Shell><ImportPage /></Shell>} />
-      <Route path="/import/:jobId" element={<Shell><ImportPage /></Shell>} />
-      <Route path="/search" element={<Shell><SearchPage /></Shell>} />
-      <Route path="/streak" element={<Shell><StreakPage /></Shell>} />
-      <Route path="/activity" element={<Shell><ActivityPage /></Shell>} />
-      <Route path="/make-note" element={<Shell><MakeNotePage /></Shell>} />
-      <Route path="/notes" element={<Navigate to="/make-note" replace />} />
-      <Route path="/settings" element={<Shell><SettingsPage /></Shell>} />
-      <Route path="/admin" element={<Shell><AdminPage /></Shell>} />
-    </Routes>
+    <Suspense fallback={<p>Loading…</p>}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/change-password" element={<ForceChangePasswordPage />} />
+        <Route path="/" element={<Shell><DashboardPage /></Shell>} />
+        <Route path="/skills" element={<Shell><SkillsPage /></Shell>} />
+        <Route path="/skills/:id" element={<Shell><SkillDetailPage /></Shell>} />
+        <Route path="/import" element={<Shell><ImportPage /></Shell>} />
+        <Route path="/import/:jobId" element={<Shell><ImportPage /></Shell>} />
+        <Route path="/search" element={<Shell><SearchPage /></Shell>} />
+        <Route path="/streak" element={<Shell><StreakPage /></Shell>} />
+        <Route path="/activity" element={<Shell><ActivityPage /></Shell>} />
+        <Route path="/make-note" element={<Shell><MakeNotePage /></Shell>} />
+        <Route path="/notes" element={<Navigate to="/make-note" replace />} />
+        <Route path="/trash" element={<Shell><TrashPage /></Shell>} />
+        <Route path="/settings" element={<Shell><SettingsPage /></Shell>} />
+        <Route path="/admin" element={<Shell><AdminPage /></Shell>} />
+      </Routes>
+    </Suspense>
   );
 }

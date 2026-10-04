@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { confirmJob, getJob, patchTree, uploadPdf, type ImportJob, type ProposedNode } from "../api/pdf.api";
 import { ApiError } from "../api/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 function PreviewNode({
   node,
@@ -249,6 +250,7 @@ function PdfGuide() {
 export default function ImportPage() {
   const { jobId } = useParams();
   const nav = useNavigate();
+  const qc = useQueryClient();
   const [job, setJob] = useState<ImportJob | null>(null);
   const [error, setError] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
@@ -302,6 +304,8 @@ export default function ImportPage() {
     if (!jobId) return;
     await saveTree();
     const done = await confirmJob(jobId, skillName || undefined);
+    qc.invalidateQueries({ queryKey: ["skills"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
     if (done.skill_id) nav(`/skills/${done.skill_id}`);
   }
 
@@ -322,9 +326,6 @@ export default function ImportPage() {
 
       {jobId && (
         <div className="grid">
-          <div className="row">
-            <Link to="/import">← Upload another PDF</Link>
-          </div>
           {statusMsg && <div className="card">{statusMsg}</div>}
           {error && <p className="error">{error}</p>}
           {job?.status === "failed" && <p className="error">{job.error_message}</p>}
@@ -342,7 +343,7 @@ export default function ImportPage() {
                   Scroll to end ↓
                 </button>
               </div>
-              <input placeholder="Skill name" value={skillName} onChange={(e) => setSkillName(e.target.value)} />
+              <input placeholder="Skill name" value={skillName} onChange={(e) => setSkillName(e.target.value)} maxLength={200} />
               <PreviewNode
                 node={tree}
                 onChange={(n) => setJob({ ...job, generated_tree_json: n })}

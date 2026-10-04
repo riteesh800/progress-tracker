@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import type { TopicNode } from "../api/topics.api";
+import { listNotes } from "../api/notes.api";
 import { completeTopic, createTopic } from "../api/topics.api";
 import { insertChildTopic, isLeafNode } from "../lib/topicTree";
 import { LineBar } from "./ProgressVisuals";
@@ -16,6 +17,23 @@ export default function TopicTree({ nodes, skillId }: { nodes: TopicNode[]; skil
   );
 }
 
+function formatNodeName(name: string) {
+  if (name.length <= 60) return name;
+  const chunks = [];
+  for (let i = 0; i < name.length; i += 60) {
+    chunks.push(name.substring(i, i + 60));
+  }
+  return (
+    <>
+      {chunks.map((chunk, index) => (
+        <span key={index} style={{ display: "block", wordBreak: "break-word" }}>
+          {chunk}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -23,6 +41,8 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
   const [childName, setChildName] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const isLeaf = isLeafNode(node);
+  const notesQuery = useQuery({ queryKey: ["notes", node.id], queryFn: () => listNotes(node.id), staleTime: 2 * 60 * 1000 });
+  const hasNotes = (notesQuery.data?.length ?? 0) > 0;
 
   const refresh = async () => {
     await Promise.all([
@@ -30,6 +50,8 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
       qc.invalidateQueries({ queryKey: ["skill", skillId] }),
       qc.invalidateQueries({ queryKey: ["dashboard"] }),
       qc.invalidateQueries({ queryKey: ["skills"] }),
+      qc.invalidateQueries({ queryKey: ["activity"] }),
+      qc.invalidateQueries({ queryKey: ["streak-calendar"] }),
     ]);
   };
 
@@ -68,17 +90,22 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
                 checked={node.is_completed}
                 onChange={(e) => toggle.mutate(e.target.checked)}
               />
-              <span>{node.name}</span>
+              <span className="node-name-wrapper">{formatNodeName(node.name)}</span>
             </label>
           ) : (
             <>
-              <span className="node-title">{node.name}</span>
+              <span className="node-title">{formatNodeName(node.name)}</span>
               <LineBar completed={node.completed_leaves} total={node.total_leaves} />
             </>
           )}
         </div>
         <div className="node-actions">
-          <button type="button" className="btn-notes" onClick={() => setShowNotes(!showNotes)}>
+          <button
+            type="button"
+            className="btn-notes"
+            style={hasNotes ? { backgroundColor: "maroon" } : undefined}
+            onClick={() => setShowNotes(!showNotes)}
+          >
             Notes
           </button>
           <button

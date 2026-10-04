@@ -15,6 +15,14 @@ if settings.database_url.startswith("sqlite"):
     engine_kwargs["poolclass"] = StaticPool
 else:
     connect_args = {"statement_cache_size": 0}
+    # Tune pool for Render free-tier + Supabase (max ~20 connections).
+    engine_kwargs.update(
+        pool_size=5,
+        max_overflow=5,
+        pool_recycle=300,
+        pool_pre_ping=True,
+        pool_timeout=30,
+    )
 
 engine = create_async_engine(settings.database_url, connect_args=connect_args, **engine_kwargs)
 

@@ -1,6 +1,6 @@
 import { api } from "./client";
 
-export type AdminUser = { id: string; name: string; email: string };
+export type AdminUser = { id: string; name: string; email: string; status: string };
 
 const ADMIN_TOKEN_KEY = "pt_admin_session";
 

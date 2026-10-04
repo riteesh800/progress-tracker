@@ -8,6 +8,7 @@ os.environ.setdefault("JWT_SECRET", "test-access-secret")
 os.environ.setdefault("JWT_REFRESH_SECRET", "test-refresh-secret")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 os.environ.setdefault("ADMIN_ACCESS_CODE", "test-admin-access-ok")
+os.environ.setdefault("CLEANUP_SECRET", "test-cleanup-secret-at-least-32-chars-long")
 
 import pytest
 from httpx import ASGITransport, AsyncClient

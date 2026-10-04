@@ -25,8 +25,8 @@ export default function SearchPage() {
   return (
     <div className="grid">
       <h1>Search</h1>
-      <form className="row" onSubmit={onSubmit}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Skills, topics, notes" />
+      <form className="row" onSubmit={onSubmit} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <input style={{ width: "75%" }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Skills, topics, notes" />
         <button className="primary" type="submit">Search</button>
       </form>
       {loading && <p>Searching…</p>}
@@ -37,7 +37,11 @@ export default function SearchPage() {
           <div className="muted">{h.kind}</div>
           <strong>{h.title}</strong>
           <p>{h.snippet}</p>
-          {h.skill_id && <Link to={`/skills/${h.skill_id}`}>Open in tree</Link>}
+          {h.skill_id && (
+            <Link to={`/skills/${h.skill_id}`} tabIndex={-1} style={{ textDecoration: "none" }}>
+              <button type="button">Open in tree</button>
+            </Link>
+          )}
         </div>
       ))}
     </div>

@@ -18,56 +18,106 @@ function formatDay(iso: string) {
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
-function padSunday(iso: string) {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const shift = date.getDay();
-  date.setDate(date.getDate() - shift);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${mm}-${dd}`;
-}
-
-function addDays(iso: string, n: number) {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  date.setDate(date.getDate() + n);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${mm}-${dd}`;
-}
+type Cell = { date: string; count: number; inRange: boolean; isPadding: boolean };
+type WeekData = { isGap: boolean; monthLabel: string; cells: Cell[] };
 
 export default function StreakPage() {
   const q = useQuery({ queryKey: ["streak-calendar"], queryFn: getStreakCalendar });
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("current");
+
+  const years = useMemo(() => {
+    if (!q.data) return [];
+    const yrs = new Set<number>();
+    if (q.data.start) yrs.add(parseInt(q.data.start.slice(0, 4)));
+    if (q.data.end) yrs.add(parseInt(q.data.end.slice(0, 4)));
+    q.data.days.forEach(d => yrs.add(parseInt(d.date.slice(0, 4))));
+    yrs.add(new Date().getFullYear());
+    return Array.from(yrs).sort((a, b) => b - a);
+  }, [q.data]);
 
   const weeks = useMemo(() => {
     if (!q.data) return [];
     const counts = new Map(q.data.days.map((d) => [d.date, d.count]));
-    const start = padSunday(q.data.start);
-    const cells: { date: string; count: number; inRange: boolean }[] = [];
-    let cursor = start;
-    while (cursor <= q.data.end) {
-      const inRange = cursor >= q.data.start;
-      cells.push({ date: cursor, count: inRange ? counts.get(cursor) ?? 0 : 0, inRange });
-      cursor = addDays(cursor, 1);
+    const out: WeekData[] = [];
+    
+    let startYear, startMonth, endYear, endMonth;
+    const now = new Date();
+    
+    if (selectedPeriod === "current") {
+      endYear = now.getFullYear();
+      endMonth = now.getMonth();
+      startYear = endYear - 1;
+      startMonth = endMonth + 1;
+      if (startMonth > 11) {
+        startMonth = 0;
+        startYear++;
+      }
+    } else {
+      const yr = parseInt(selectedPeriod);
+      startYear = yr;
+      startMonth = 0;
+      endYear = yr;
+      endMonth = 11;
     }
-    const out: typeof cells[] = [];
-    for (let i = 0; i < cells.length; i += 7) out.push(cells.slice(i, i + 7));
-    return out;
-  }, [q.data]);
 
-  const monthLabels = useMemo(() => {
-    return weeks.map((week, i) => {
-      const first = week.find((c) => c.inRange);
-      if (!first) return "";
-      const month = Number(first.date.slice(5, 7));
-      if (i === 0) return MONTHS[month - 1];
-      const prev = weeks[i - 1].find((c) => c.inRange);
-      if (!prev) return MONTHS[month - 1];
-      return Number(prev.date.slice(5, 7)) !== month ? MONTHS[month - 1] : "";
-    });
-  }, [weeks]);
+    let currY = startYear;
+    let currM = startMonth;
+
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    while (currY < endYear || (currY === endYear && currM <= endMonth)) {
+      const daysInMonth = new Date(currY, currM + 1, 0).getDate();
+      const firstDay = new Date(currY, currM, 1).getDay();
+      const numWeeks = Math.ceil((daysInMonth + firstDay) / 7);
+      const middleWeek = Math.floor(numWeeks / 2);
+
+      let currentWeek: Cell[] = Array.from({ length: 7 }, () => ({ date: "", count: 0, inRange: false, isPadding: true }));
+      let weekIndex = 0;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+         const dateObj = new Date(currY, currM, d);
+         const dayOfWeek = dateObj.getDay();
+         
+         const mm = String(currM + 1).padStart(2, '0');
+         const dd = String(d).padStart(2, '0');
+         const dateStr = `${currY}-${mm}-${dd}`;
+         
+         currentWeek[dayOfWeek] = {
+             date: dateStr,
+             count: counts.get(dateStr) ?? 0,
+             inRange: dateStr <= todayStr,
+             isPadding: false
+         };
+         
+         if (dayOfWeek === 6 || d === daysInMonth) {
+             out.push({ 
+                 isGap: false, 
+                 monthLabel: weekIndex === middleWeek ? MONTHS[currM] : "",
+                 cells: [...currentWeek]
+             });
+             currentWeek = Array.from({ length: 7 }, () => ({ date: "", count: 0, inRange: false, isPadding: true }));
+             weekIndex++;
+         }
+      }
+      
+      currM++;
+      if (currM > 11) {
+          currM = 0;
+          currY++;
+      }
+      
+      if (currY < endYear || (currY === endYear && currM <= endMonth)) {
+          out.push({ 
+              isGap: true, 
+              monthLabel: "", 
+              cells: Array.from({ length: 7 }, () => ({ date: "", count: 0, inRange: false, isPadding: true }))
+          });
+      }
+    }
+    
+    return out;
+  }, [q.data, selectedPeriod]);
 
   if (q.isPending) return <p>Loading streak…</p>;
   if (q.isError || !q.data) return <p className="error">Could not load streak history.</p>;
@@ -75,7 +125,19 @@ export default function StreakPage() {
 
   return (
     <div className="grid streak-page">
-      <h1>Streak</h1>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h1>Streak</h1>
+        <select 
+           value={selectedPeriod} 
+           onChange={(e) => setSelectedPeriod(e.target.value)}
+           style={{ width: "auto", minWidth: "220px" }}
+        >
+           <option value="current">Current (Last 12 Months)</option>
+           {years.map(y => (
+               <option key={y} value={String(y)}>{y}</option>
+           ))}
+        </select>
+      </div>
       <div className="card streak-card">
         <div className="streak-stats">
           <div>
@@ -90,19 +152,28 @@ export default function StreakPage() {
         </div>
         <div className="cal-wrap">
           <div className="cal-months">
-            {monthLabels.map((label, i) => (
-              <span key={i} className="cal-month">{label}</span>
+            {weeks.map((week, wi) => (
+              <span 
+                key={wi} 
+                className="cal-month" 
+                style={{ 
+                  width: week.isGap ? "4px" : undefined, 
+                  textAlign: week.monthLabel ? "center" : undefined 
+                }}
+              >
+                {week.monthLabel}
+              </span>
             ))}
           </div>
           <div className="cal-grid">
             {weeks.map((week, wi) => (
-              <div className="cal-week" key={wi}>
-                {week.map((cell) => (
+              <div className="cal-week" style={week.isGap ? { width: "4px" } : undefined} key={wi}>
+                {!week.isGap && week.cells.map((cell, idx) => (
                   <span
-                    key={cell.date}
-                    className={`cal-day lvl-${cell.inRange ? level(cell.count) : "pad"}`}
+                    key={cell.date || `pad-${wi}-${idx}`}
+                    className={`cal-day lvl-${!cell.isPadding && cell.inRange ? level(cell.count) : "pad"}`}
                     onMouseEnter={(e) => {
-                      if (!cell.inRange) return;
+                      if (cell.isPadding || !cell.inRange) return;
                       setTip({
                         text: `${formatDay(cell.date)} — ${cell.count} submissions`,
                         x: e.clientX,

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { me } from "../api/auth.api";
@@ -21,6 +21,34 @@ export default function AdminPage() {
   const [unlockError, setUnlockError] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [unlocked, setUnlocked] = useState(Boolean(getAdminToken()));
+
+  // Keep a ref so event handlers always see the latest unlocked value
+  const unlockedRef = useRef(unlocked);
+  useEffect(() => { unlockedRef.current = unlocked; }, [unlocked]);
+
+  // Lock the admin session (clear token + reset state)
+  const lockAdmin = useCallback(() => {
+    if (unlockedRef.current) {
+      clearAdminToken();
+      setUnlocked(false);
+    }
+  }, []);
+
+  // Immediately re-lock admin when navigating away (unmount) or leaving
+  // the page context (tab switch, minimize, alt-tab, etc.)
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.hidden) {
+        lockAdmin();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      // Component unmounting = navigating away from /admin
+      lockAdmin();
+    };
+  }, [lockAdmin]);
 
   const [target, setTarget] = useState<{ id: string; email: string; name: string } | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -132,12 +160,18 @@ export default function AdminPage() {
           <div className="admin-table-head">
             <span>Name</span>
             <span>Email</span>
+            <span>Status</span>
             <span>Change Password</span>
           </div>
           {users.data.map((u) => (
             <div className="admin-table-row" key={u.id}>
               <span title={u.name}>{u.name || "—"}</span>
               <span title={u.email}>{u.email}</span>
+              <span>
+                <span className={`admin-status admin-status--${u.status.toLowerCase().replace(/ /g, "-")}`}>
+                  {u.status}
+                </span>
+              </span>
               <span>
                 <button type="button" onClick={() => { setTarget(u); setPwError(""); setNewPassword(""); }}>
                   Change Password

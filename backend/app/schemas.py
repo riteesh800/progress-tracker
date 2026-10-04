@@ -88,6 +88,7 @@ class AdminUserOut(BaseModel):
     id: UUID
     name: str
     email: EmailStr
+    status: str = "Active"
 
     model_config = {"from_attributes": True}
 
@@ -113,12 +114,12 @@ class UserUpdateIn(BaseModel):
 
 
 class SkillIn(BaseModel):
-    name: str = Field(min_length=1, max_length=300)
+    name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
 
 
 class SkillUpdateIn(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=300)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
 
 
@@ -131,6 +132,8 @@ class SkillOut(BaseModel):
     total_leaves: int = 0
     percent: float = 0
     empty: bool = True
+    deleted_at: Optional[datetime] = None
+    purge_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -312,5 +315,26 @@ class TreePatchIn(BaseModel):
 
 
 class ConfirmImportIn(BaseModel):
-    skill_name: Optional[str] = None
+    skill_name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     skill_description: Optional[str] = None
+
+
+class SkillTimerIn(BaseModel):
+    from_date: date
+    to_date: date
+
+    @field_validator("to_date")
+    @classmethod
+    def valid_to_date(cls, v: date, info: Any) -> date:
+        if "from_date" in info.data and v <= info.data["from_date"]:
+            raise ValueError("to_date must be after from_date")
+        return v
+
+
+class SkillTimerOut(BaseModel):
+    id: UUID
+    skill_id: UUID
+    from_date: date
+    to_date: date
+
+    model_config = {"from_attributes": True}

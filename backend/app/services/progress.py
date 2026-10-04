@@ -100,6 +100,21 @@ async def load_skill_topics(session: AsyncSession, skill_id: UUID) -> list[Topic
     return list(result.scalars().all())
 
 
+async def load_user_topics_grouped(
+    session: AsyncSession, skill_ids: list[UUID]
+) -> dict[UUID, list[Topic]]:
+    """Load topics for multiple skills in a single query, grouped by skill_id."""
+    if not skill_ids:
+        return {}
+    result = await session.execute(
+        select(Topic).where(Topic.skill_id.in_(skill_ids))
+    )
+    grouped: dict[UUID, list[Topic]] = defaultdict(list)
+    for t in result.scalars().all():
+        grouped[t.skill_id].append(t)
+    return grouped
+
+
 def compute_streak(completion_dates: list[date], today: date) -> tuple[int, int]:
     """
     Grace rule (Part 5): streak breaks only after two or more consecutive calendar

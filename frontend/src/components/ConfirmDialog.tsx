@@ -8,6 +8,7 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  maxWidth?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -20,6 +21,7 @@ export default function ConfirmDialog({
   cancelLabel = "Cancel",
   danger = true,
   busy = false,
+  maxWidth,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -37,6 +39,7 @@ export default function ConfirmDialog({
     <div className="dialog-backdrop" role="presentation" onClick={() => !busy && onCancel()}>
       <div
         className="dialog-card"
+        style={maxWidth ? { maxWidth } : undefined}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
@@ -44,7 +47,7 @@ export default function ConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="confirm-title">{title}</h2>
-        <p id="confirm-body" className="muted">{body}</p>
+        <p id="confirm-body" className="muted" style={{ whiteSpace: "pre-wrap" }}>{body}</p>
         <div className="dialog-actions">
           <button type="button" onClick={onCancel} disabled={busy}>{cancelLabel}</button>
           <button

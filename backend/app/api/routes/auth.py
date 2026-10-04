@@ -40,6 +40,8 @@ from app.services.email import send_password_reset_email
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
 
+DELETION_RECOVERY_HOURS = 72
+
 
 def _aware(dt: datetime) -> datetime:
     if dt.tzinfo is None:
@@ -49,6 +51,28 @@ def _aware(dt: datetime) -> datetime:
 
 def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _is_deletion_expired(user: User) -> bool:
+    """Return True if the user's deletion deadline has passed."""
+    if user.deletion_deadline is None:
+        return False
+    now = datetime.now(timezone.utc)
+    return now >= _aware(user.deletion_deadline)
+
+
+async def _cancel_pending_deletion(user: User, session: AsyncSession) -> None:
+    """Cancel pending deletion and restore account to normal."""
+    user.deletion_requested_at = None
+    user.deletion_deadline = None
+    user.last_active_at = datetime.now(timezone.utc)
+
+
+async def _permanently_delete_user(user_id: UUID, session: AsyncSession) -> None:
+    """Permanently delete a user and all their data via CASCADE."""
+    # SQL DELETE so SQLite/Postgres ON DELETE CASCADE removes skills, notes, tokens, etc.
+    # ORM session.delete() would try to NULL skills.user_id and hit NOT NULL.
+    await session.execute(delete(User).where(User.id == user_id))
 
 
 async def _issue_tokens(session: AsyncSession, user: User) -> TokenPair:
@@ -78,6 +102,7 @@ async def register(request: Request, body: RegisterIn, session: AsyncSession = D
         password_hash=hash_password(body.password),
         name=body.name or body.email.split("@")[0],
         timezone=body.timezone or "UTC",
+        last_active_at=datetime.now(timezone.utc),
     )
     session.add(user)
     try:
@@ -99,6 +124,24 @@ async def login(request: Request, body: LoginIn, session: AsyncSession = Depends
         raise AppError(401, "invalid_credentials", "Invalid email or password.")
     if not user.is_active:
         raise AppError(401, "inactive", "Account is inactive.")
+
+    # Handle pending deletion
+    if user.deletion_requested_at is not None:
+        if _is_deletion_expired(user):
+            # Deadline passed — permanently delete and reject login
+            uid = user.id
+            await _permanently_delete_user(uid, session)
+            await session.commit()
+            logger.info("Permanently deleted expired account during login: %s", body.email.lower())
+            raise AppError(401, "invalid_credentials", "Invalid email or password.")
+        else:
+            # Within recovery window — cancel deletion
+            await _cancel_pending_deletion(user, session)
+            logger.info("Account deletion cancelled via login: %s", body.email.lower())
+    else:
+        # Normal login — update last active
+        user.last_active_at = datetime.now(timezone.utc)
+
     return await _issue_tokens(session, user)
 
 
@@ -112,6 +155,12 @@ async def refresh(body: RefreshIn, session: AsyncSession = Depends(get_db)):
         raise AppError(401, "invalid_refresh", "Refresh token is invalid or expired.")
     user = await session.get(User, row.user_id)
     if user is None or not user.is_active:
+        raise AppError(401, "unauthenticated", "User not found or inactive.")
+    # If deletion has expired, reject and clean up
+    if user.deletion_requested_at is not None and _is_deletion_expired(user):
+        uid = user.id
+        await _permanently_delete_user(uid, session)
+        await session.commit()
         raise AppError(401, "unauthenticated", "User not found or inactive.")
     if _aware(row.expires_at) < now:
         raise AppError(401, "invalid_refresh", "Refresh token is invalid or expired.")
@@ -154,17 +203,31 @@ async def google_login(request: Request, body: GoogleIn, session: AsyncSession =
     result = await session.execute(select(User).where(User.email == email.lower()))
     user = result.scalar_one_or_none()
     if user:
-        if not user.google_id:
-            user.google_id = google_id
-        elif user.google_id != google_id:
-            raise AppError(409, "google_mismatch", "This email is linked to a different Google account.")
-    else:
+        # Handle pending deletion for Google login
+        if user.deletion_requested_at is not None:
+            if _is_deletion_expired(user):
+                uid = user.id
+                await _permanently_delete_user(uid, session)
+                await session.commit()
+                # Re-create as new account below
+                user = None
+            else:
+                await _cancel_pending_deletion(user, session)
+        else:
+            user.last_active_at = datetime.now(timezone.utc)
+        if user is not None:
+            if not user.google_id:
+                user.google_id = google_id
+            elif user.google_id != google_id:
+                raise AppError(409, "google_mismatch", "This email is linked to a different Google account.")
+    if user is None:
         user = User(
             email=email.lower(),
             password_hash=None,
             google_id=google_id,
             name=name or email.split("@")[0],
             timezone=body.timezone or "UTC",
+            last_active_at=datetime.now(timezone.utc),
         )
         session.add(user)
         try:
@@ -235,7 +298,7 @@ async def forgot_password(request: Request, body: ForgotPasswordIn, session: Asy
         )
     )
     await session.commit()
-    send_password_reset_email(user.email, code)
+    await send_password_reset_email(user.email, code)
     payload: dict = {"ok": True, "message": "Reset code sent to your email."}
     if settings.environment == "test":
         payload["dev_code"] = code
@@ -311,9 +374,8 @@ async def delete_account(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    uid: UUID = user.id
-    # SQL DELETE so SQLite/Postgres ON DELETE CASCADE removes skills, notes, tokens, etc.
-    # ORM session.delete() would try to NULL skills.user_id and hit NOT NULL.
-    await session.execute(delete(User).where(User.id == uid))
+    now = datetime.now(timezone.utc)
+    user.deletion_requested_at = now
+    user.deletion_deadline = now + timedelta(hours=DELETION_RECOVERY_HOURS)
     await session.commit()
     return {"ok": True}

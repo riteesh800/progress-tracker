@@ -73,6 +73,15 @@ class User(Base, TimestampMixin):
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    deletion_deadline: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    last_active_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
 
     skills: Mapped[list["Skill"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
@@ -84,13 +93,16 @@ class User(Base, TimestampMixin):
 
 class Skill(Base, TimestampMixin):
     __tablename__ = "skills"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_skills_user_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    name: Mapped[str] = mapped_column(String(300), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    purge_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="skills")
     topics: Mapped[list["Topic"]] = relationship(
@@ -103,6 +115,7 @@ class Topic(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_topics_skill_parent_order", "skill_id", "parent_id", "order_index"),
         Index("ix_topics_parent_id", "parent_id"),
+        Index("ix_topics_skill_id", "skill_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
@@ -258,3 +271,18 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class SkillTimer(Base, TimestampMixin):
+    __tablename__ = "skill_timers"
+    __table_args__ = (UniqueConstraint("user_id", "skill_id", name="uq_skill_timers_user_skill"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    skill_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_date: Mapped[date] = mapped_column(Date, nullable=False)
+    to_date: Mapped[date] = mapped_column(Date, nullable=False)

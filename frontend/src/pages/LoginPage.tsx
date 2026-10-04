@@ -95,13 +95,23 @@ export default function LoginPage() {
           {mode !== "forgot" && (
           <label>
             Email
-            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" />
+            <input 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              type="email" 
+              required 
+              autoComplete="email"
+              pattern="^[^\s@]+@[gG][mM][aA][iI][lL]\.[cC][oO][mM]$"
+            />
+            {email.length > 0 && !/^[^\s@]+@gmail\.com$/i.test(email) && (
+              <div className="error">Enter a valid email</div>
+            )}
           </label>
           )}
           {mode === "register" && (
             <label>
               Name
-              <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+              <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={25} />
             </label>
           )}
           {mode === "verify" && (

@@ -26,17 +26,20 @@ export default function DashboardPage() {
           <h1>Dashboard</h1>
           <p className="muted">Your home for turning a syllabus into visible, lasting progress.</p>
         </div>
-        <div className="dash-hero-actions">
-          <Link className="dash-link" to="/import">Import PDF</Link>
-          <Link className="dash-link" to="/skills">Open skills</Link>
-        </div>
       </header>
 
       {d.empty ? (
         <div className="card">
           <h2>No skills yet</h2>
           <p className="muted">Upload a syllabus PDF or create a skill to start tracking leaves.</p>
-          <p><Link to="/import">Import a PDF</Link> · <Link to="/skills">Create a skill</Link></p>
+          <div className="row">
+            <Link to="/import" tabIndex={-1} style={{ textDecoration: "none" }}>
+              <button type="button">Import a PDF</button>
+            </Link>
+            <Link to="/skills" tabIndex={-1} style={{ textDecoration: "none" }}>
+              <button type="button">Create a skill</button>
+            </Link>
+          </div>
         </div>
       ) : (
         <section className="dash-overview">

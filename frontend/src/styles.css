@@ -104,7 +104,20 @@ input[type="checkbox"] {
 .main { min-width: 0; min-height: 100vh; }
 .page { padding: 1.25rem 1.5rem; width: 100%; max-width: none; margin: 0; }
 .grid { display: grid; gap: 1rem; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; }
+.cards { 
+  display: grid; 
+  grid-template-columns: repeat(4, 1fr); 
+  gap: 0.8rem; 
+}
+@media (max-width: 1100px) {
+  .cards { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 800px) {
+  .cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 500px) {
+  .cards { grid-template-columns: 1fr; }
+}
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; }
 .skill-card {
   position: relative;
@@ -165,14 +178,14 @@ input[type="checkbox"] {
 }
 .node-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
   flex-wrap: nowrap;
   min-width: 0;
 }
 .node-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
   flex: 1;
   min-width: 0;
@@ -180,7 +193,7 @@ input[type="checkbox"] {
 .node-leaf {
   display: inline-flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
   min-width: 0;
   flex: 1;
@@ -189,12 +202,10 @@ input[type="checkbox"] {
 }
 .node-leaf span,
 .node-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   line-height: 1.3;
+  word-break: break-word;
 }
-.node-title { font-weight: 400; min-width: 0; }
+.node-title { font-weight: 400; min-width: 0; flex: 1; }
 .node-actions {
   display: flex;
   align-items: center;
@@ -213,11 +224,16 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  width: 220px;
+  flex-shrink: 0;
+}
+.line-bar > .muted {
   flex: 1;
-  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
 }
 .bar {
-  height: 8px; background: #0b1218; border-radius: 99px; overflow: hidden; min-width: 48px; flex: 1;
+  height: 8px; background: #0b1218; border-radius: 99px; overflow: hidden; width: 4cm; flex-shrink: 0;
 }
 .bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 .donut-wrap { display: grid; place-items: center; }
@@ -267,17 +283,18 @@ input[type="checkbox"] {
 .cal-months, .cal-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 13px;
+  grid-auto-columns: max-content;
   column-gap: 3px;
 }
 .cal-month {
+  width: 13px;
   height: 1.1rem;
   font-size: 0.7rem;
   color: var(--muted);
   overflow: visible;
   white-space: nowrap;
 }
-.cal-week { display: grid; grid-template-rows: repeat(7, 11px); row-gap: 3px; }
+.cal-week { width: 13px; display: grid; grid-template-rows: repeat(7, 11px); row-gap: 3px; }
 .cal-day {
   width: 11px;
   height: 11px;
@@ -785,16 +802,6 @@ button:disabled {
   flex-wrap: wrap;
   align-items: flex-end;
 }
-.dash-hero-actions { display: flex; gap: 0.5rem; }
-.dash-link {
-  border: 1px solid var(--line);
-  background: #1a222c;
-  color: var(--text);
-  text-decoration: none;
-  padding: 0.4rem 0.75rem;
-  border-radius: 10px;
-}
-.dash-link:hover { border-color: var(--accent); color: var(--accent); }
 .accent-text { color: var(--accent); }
 .warn-text { color: var(--warn); }
 .dash-overview {
@@ -995,7 +1002,7 @@ button:disabled {
 .admin-table-head,
 .admin-table-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 1.4fr) auto;
+  grid-template-columns: minmax(8rem, 1fr) minmax(10rem, 1.4fr) 1fr auto;
   gap: 0.75rem;
   align-items: center;
   padding: 0.7rem 1rem;
@@ -1014,6 +1021,25 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.admin-status {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.admin-status--active {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--ok);
+}
+.admin-status--not-active {
+  background: rgba(147, 164, 181, 0.12);
+  color: var(--muted);
+}
+.admin-status--deleted {
+  background: rgba(251, 113, 133, 0.15);
+  color: var(--danger);
 }
 .admin-pw-card { display: grid; gap: 0.7rem; max-width: 480px; }
 .admin-pw-card h2 { margin: 0; }
@@ -1042,4 +1068,18 @@ button:disabled {
 .scroll-end-btn:hover {
   background: #1a6b64;
   transform: translateY(2px);
+}
+
+/* Make date input calendar icon white */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+/* Make password toggle eye icon white */
+.pw-toggle {
+  color: #ffffff;
+}
+.pw-toggle svg {
+  stroke: #ffffff;
 }

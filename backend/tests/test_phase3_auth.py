@@ -126,5 +126,7 @@ async def test_delete_account_with_skills(client):
     await client.post("/skills", json={"name": "DSA"}, headers=h)
     res = await client.delete("/auth/me", headers=h)
     assert res.status_code == 200
+    # Login within 72h should succeed (recovery) — this is the new behavior
     login = await client.post("/auth/login", json={"email": "gone@example.com", "password": "password1"})
-    assert login.status_code == 401
+    assert login.status_code == 200
+
