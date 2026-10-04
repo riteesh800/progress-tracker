@@ -18,9 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     with op.batch_alter_table("skills") as batch_op:
-        batch_op.alter_column("name", type_=sa.String(200), existing_type=sa.String(300))
+        pass
 
 
 def downgrade() -> None:
     with op.batch_alter_table("skills") as batch_op:
-        batch_op.alter_column("name", type_=sa.String(300), existing_type=sa.String(200))
+        pass
