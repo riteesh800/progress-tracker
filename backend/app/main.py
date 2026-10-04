@@ -91,7 +91,7 @@ def create_app() -> FastAPI:
             content=error_payload(422, "validation_error", "Invalid request payload."),
         )
 
-    from app.api.routes import admin, auth, dashboard, notes, pdf, personal_notes, search, skills, topics, timer
+    from app.api.routes import timer
 
     application.include_router(auth.router)
     application.include_router(admin.router)

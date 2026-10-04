@@ -8,15 +8,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
-    ActivityLog,
-    ImportJob,
-    Note,
-    PasswordResetToken,
-    PersonalNote,
-    PersonalNoteTask,
     RefreshToken,
     Skill,
-    SkillTimer,
     Topic,
     User,
 )

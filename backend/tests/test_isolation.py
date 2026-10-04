@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import pytest
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
-    User, Skill, Topic, Note, ActivityLog, PersonalNote, PersonalNoteTask, RefreshToken
+    User, Skill, Note, ActivityLog, PersonalNote, PersonalNoteTask, RefreshToken
 )
 from tests.conftest import auth_header, register
 
