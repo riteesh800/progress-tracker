@@ -30,7 +30,7 @@ Create Skill → Upload PDF → Parse → Preview / Edit → Confirm → Track L
 
 9. **Trash Management** — Deleted skills and topics don't disappear immediately; they are safely moved to a Trash bin. This protects you from accidental deletions by allowing full recovery for up to 30 days before permanent automatic removal.
 
-10. **Account Management & Deletion** — Fully control your data privacy through the Settings page. If you decide to leave the platform, you can permanently delete your entire account, which instantly purges all your personal data, skills, topics, and notes from the database.
+10. **Account Management & Deletion** — Fully control your data privacy through the Settings page. If you decide to leave the platform, you can choose to delete your account. The deletion takes effect after a 3-day grace period, giving you time to recover your account if you change your mind. After 3 days, it permanently purges all your personal data, skills, topics, and notes from the database.
 
 ---
 
