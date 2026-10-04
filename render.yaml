@@ -11,26 +11,4 @@ services:
       - key: ENVIRONMENT
         value: production
 
-  - type: cron
-    name: progress-tracker-cleanup
-    runtime: python
-    plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    # Runs every hour. Hits the cleanup endpoint with the shared secret.
-    schedule: "0 * * * *"
-    startCommand: >-
-      python -c "
-      import urllib.request, os, json;
-      url = os.environ['RENDER_EXTERNAL_URL'] + '/admin/cron/cleanup';
-      req = urllib.request.Request(url, method='POST',
-        headers={'Authorization': 'Bearer ' + os.environ['CLEANUP_SECRET'],
-                 'Content-Type': 'application/json'});
-      resp = urllib.request.urlopen(req, timeout=30);
-      print(json.loads(resp.read()))
-      "
-    envVars:
-      - key: CLEANUP_SECRET
-        sync: false
-      - key: RENDER_EXTERNAL_URL
-        sync: false
+
