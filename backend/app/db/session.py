@@ -14,7 +14,10 @@ if settings.database_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
     engine_kwargs["poolclass"] = StaticPool
 else:
-    connect_args = {"statement_cache_size": 0}
+    connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
     # Tune pool for Render free-tier + Supabase (max ~20 connections).
     engine_kwargs.update(
         pool_size=5,
