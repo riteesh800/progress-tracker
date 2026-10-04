@@ -26,6 +26,12 @@ Create Skill → Upload PDF → Parse → Preview / Edit → Confirm → Track L
 
 7. **Authentication** — Email + password registration with Argon2 hashing, JWT access/refresh tokens (15 min / 30 days, rotated and revocable), Google Sign-In with automatic account linking, and a forgot-password flow with time-limited single-use reset codes.
 
+8. **Skill Timer** — Log actual time spent on any skill using a built-in stopwatch. Simply start the timer when you begin studying, and stop it when you're done; the time is automatically calculated and securely logged to your dashboard. This helps you track total effort invested beyond just completing checkboxes.
+
+9. **Trash Management** — Deleted skills and topics don't disappear immediately; they are safely moved to a Trash bin. This protects you from accidental deletions by allowing full recovery for up to 30 days before permanent automatic removal.
+
+10. **Account Management & Deletion** — Fully control your data privacy through the Settings page. If you decide to leave the platform, you can permanently delete your entire account, which instantly purges all your personal data, skills, topics, and notes from the database.
+
 ---
 
 ## Tech Stack
@@ -182,6 +188,14 @@ Vercel hosts the React SPA (static build output).
      - `VITE_GOOGLE_CLIENT_ID` — same as the backend's Google Client ID (if using Google Sign-In)
   7. The `vercel.json` rewrites all routes to `index.html` for SPA client-side routing.
 
+### Automating Trash Cleanup (Cron Job)
+
+To keep the database clean, items placed in the trash automatically expire and are permanently deleted after 30 days. Because Render's free tier does not include native cron jobs, this system-wide background task is fully automated externally using [cron-job.org](https://cron-job.org).
+- **What it is:** A free external automation service that acts like a robot, sending a scheduled ping to a hidden admin API endpoint (`/admin/cron/cleanup`).
+- **Why it is needed:** Without automation, expired trash items would bloat the database forever. Additionally, pinging the server frequently (e.g., every 14 minutes) prevents the free Render instance from going to sleep, ensuring the API is always lightning fast!
+- **How it works:** At the scheduled interval, the cron service makes an HTTP `POST` request containing a secure `Authorization: Bearer CLEANUP_SECRET` header. It cannot access your database directly, nor can it see any user data or passwords.
+- **What it does:** Upon receiving the correct secret password, the backend securely runs a system-wide sweep to permanently delete any trash older than 30 days, and simply returns a success status back to the cron service.
+
 ### Environment Variables Reference
 
 See `.env.example` for the complete list:
@@ -199,6 +213,7 @@ See `.env.example` for the complete list:
 | `ENVIRONMENT` | Yes | `development` or `production` |
 | `VITE_API_BASE` | Prod only | Backend URL for the frontend in production |
 | `VITE_GOOGLE_CLIENT_ID` | No | Google Client ID for the frontend |
+| `CLEANUP_SECRET` | Prod only | Secret token used to authenticate the automated trash cleanup cron job |
 
 ---
 
