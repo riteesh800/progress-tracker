@@ -41,7 +41,7 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
   const [childName, setChildName] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const isLeaf = isLeafNode(node);
-  const notesQuery = useQuery({ queryKey: ["notes", node.id], queryFn: () => listNotes(node.id), staleTime: 2 * 60 * 1000 });
+  const notesQuery = useQuery({ queryKey: ["notes", node.id], queryFn: () => listNotes(node.id), staleTime: 2 * 60 * 1000, enabled: showNotes });
   const hasNotes = (notesQuery.data?.length ?? 0) > 0;
 
   const refresh = async () => {
