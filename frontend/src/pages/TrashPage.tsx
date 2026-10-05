@@ -85,7 +85,8 @@ export default function TrashPage() {
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <button
                 type="button"
-                style={{ flex: 1, backgroundColor: "var(--success-color, #10b981)", color: "white", border: "none", borderRadius: "4px", padding: "0.5rem", cursor: "pointer", fontWeight: 600 }}
+                className="primary"
+                style={{ flex: 1 }}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
