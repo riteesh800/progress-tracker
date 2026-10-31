@@ -367,3 +367,35 @@ async def test_confirm_empty_topic_name_rejected(client: AsyncClient):
     )
     assert res.status_code == 400
     assert res.json()["error"]["code"] == "empty_topic_name"
+
+
+@pytest.mark.asyncio
+async def test_gemini_fallback_on_model_not_found():
+    from app.services.gemini import _call_gemini
+    from unittest.mock import MagicMock
+
+    attempts = []
+
+    def mock_generative_model(model_name, **kwargs):
+        attempts.append(model_name)
+        mock_instance = MagicMock()
+        if "gemini-3.8-flash" in model_name:
+            # First attempt fails with 404 / no longer available
+            async def fail(*args, **kw):
+                raise Exception("404 This model models/gemini-3.8-flash is no longer available.")
+            mock_instance.generate_content_async = fail
+        else:
+            # Fallback model succeeds
+            async def succeed(*args, **kw):
+                res = MagicMock()
+                res.text = json.dumps(MOCK_VALID_SYLLABUS)
+                return res
+            mock_instance.generate_content_async = succeed
+        return mock_instance
+
+    with patch("app.core.config.settings.gemini_api_key", "test-key"),          patch("app.core.config.settings.gemini_model", "gemini-3.8-flash"),          patch("google.generativeai.GenerativeModel", side_effect=mock_generative_model):
+        raw = await _call_gemini("test prompt")
+        assert raw is not None
+        assert len(attempts) >= 2
+        assert "gemini-3.8-flash" in attempts[0]
+        assert "gemini-2.5-flash" in attempts[1]

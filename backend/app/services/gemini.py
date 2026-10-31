@@ -263,22 +263,26 @@ def _handle_gemini_error(exc: Exception) -> None:
         raise AppError(
             429, "ai_rate_limited", "AI generation rate limit or quota exceeded. Please wait a moment and try again."
         )
-    if "not found" in exc_str and "model" in exc_str:
+    if "not found" in exc_str or "404" in exc_str or "no longer available" in exc_str or "is not found" in exc_str:
         raise AppError(
-            503, "ai_model_unavailable", "The requested AI model is unavailable. Please contact the administrator."
+            503,
+            "ai_model_unavailable",
+            "The requested AI model is unavailable or retired. Please update GEMINI_MODEL to gemini-3.8-flash.",
         )
     if "timeout" in exc_str or "deadline" in exc_str:
         raise AppError(504, "ai_timeout", "AI generation timed out. Please try again.")
     if "safety" in exc_str or "blocked" in exc_str:
         raise AppError(
-            422, "ai_blocked", "The syllabus request was blocked by content safety filters. Please try a different subject."
+            422,
+            "ai_blocked",
+            "The syllabus request was blocked by content safety filters. Please try a different subject.",
         )
 
     raise AppError(502, "ai_error", "AI generation failed. Please try again.")
 
 
 async def _call_gemini(prompt: str, *, temperature: float = 0.7) -> str:
-    """Low-level async call to Gemini API."""
+    """Low-level async call to Gemini API with automatic model fallback."""
     if not settings.gemini_api_key:
         raise AppError(
             503,
@@ -296,25 +300,62 @@ async def _call_gemini(prompt: str, *, temperature: float = 0.7) -> str:
         )
 
     genai.configure(api_key=settings.gemini_api_key)
-    model_name = settings.gemini_model or "gemini-2.0-flash"
 
-    try:
-        model = genai.GenerativeModel(
-            model_name,
-            system_instruction=SYSTEM_PROMPT,
-        )
-        response = await model.generate_content_async(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=temperature,
-                max_output_tokens=8192,
-            ),
-        )
-    except AppError:
-        raise
-    except Exception as exc:
-        _handle_gemini_error(exc)
+    configured = (settings.gemini_model or "").strip()
+    # gemini-2.0-flash has been retired by Google in favor of gemini-3.8-flash
+    if configured == "gemini-2.0-flash":
+        configured = "gemini-3.8-flash"
+
+    candidates: list[str] = []
+    if configured:
+        candidates.append(configured)
+    for fallback in ("gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"):
+        if fallback not in candidates:
+            candidates.append(fallback)
+
+    last_exc: Exception | None = None
+    response = None
+
+    for idx, model_name in enumerate(candidates):
+        try:
+            model = genai.GenerativeModel(
+                model_name,
+                system_instruction=SYSTEM_PROMPT,
+            )
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json",
+                    temperature=temperature,
+                    max_output_tokens=8192,
+                ),
+            )
+            # Succeeded with this model
+            break
+        except Exception as exc:
+            last_exc = exc
+            exc_str = str(exc).lower()
+            is_model_unavailable = (
+                "not found" in exc_str
+                or "404" in exc_str
+                or "no longer available" in exc_str
+                or "is not found" in exc_str
+                or "not supported" in exc_str
+            )
+            if is_model_unavailable and idx + 1 < len(candidates):
+                logger.warning(
+                    "Gemini model '%s' unavailable (%s). Falling back to '%s'...",
+                    model_name,
+                    exc,
+                    candidates[idx + 1],
+                )
+                continue
+            _handle_gemini_error(exc)
+
+    if response is None:
+        if last_exc:
+            _handle_gemini_error(last_exc)
+        raise AppError(502, "ai_error", "AI generation failed. Please try again.")
 
     if not response or not response.text:
         if response and hasattr(response, "prompt_feedback") and response.prompt_feedback:

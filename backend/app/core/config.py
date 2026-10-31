@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.8-flash"
     cors_origins: str = "http://localhost:5173"
     smtp_host: str = ""
     smtp_port: int = 587
