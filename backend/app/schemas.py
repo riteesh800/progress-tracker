@@ -338,3 +338,98 @@ class SkillTimerOut(BaseModel):
     to_date: date
 
     model_config = {"from_attributes": True}
+
+
+class GenerateSyllabusIn(BaseModel):
+    subject: str = Field(min_length=1, max_length=300)
+    depth: str
+    purpose: str
+
+    @field_validator("subject")
+    @classmethod
+    def clean_subject(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Subject cannot be empty")
+        return v
+
+    @field_validator("depth")
+    @classmethod
+    def valid_depth(cls, v: str) -> str:
+        allowed = {"easy", "medium", "intermediate", "comprehensive"}
+        if v.lower() not in allowed:
+            raise ValueError(f"depth must be one of: {', '.join(sorted(allowed))}")
+        return v.lower()
+
+    @field_validator("purpose")
+    @classmethod
+    def valid_purpose(cls, v: str) -> str:
+        allowed = {"interview", "quiz", "a_to_z"}
+        if v.lower() not in allowed:
+            raise ValueError(f"purpose must be one of: {', '.join(sorted(allowed))}")
+        return v.lower()
+
+
+class TopicNodeAI(BaseModel):
+    name: str
+    children: list["TopicNodeAI"] = []
+
+
+class GenerateSyllabusOut(BaseModel):
+    skill_name: str
+    topics: list[TopicNodeAI]
+
+
+class RefineSyllabusIn(BaseModel):
+    subject: str = Field(min_length=1, max_length=300)
+    depth: str
+    purpose: str
+    current_tree: dict[str, Any]
+    conversation_history: list[dict[str, str]] = []
+    instruction: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("subject")
+    @classmethod
+    def clean_subject(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Subject cannot be empty")
+        return v
+
+    @field_validator("depth")
+    @classmethod
+    def valid_depth(cls, v: str) -> str:
+        allowed = {"easy", "medium", "intermediate", "comprehensive"}
+        if v.lower() not in allowed:
+            raise ValueError(f"depth must be one of: {', '.join(sorted(allowed))}")
+        return v.lower()
+
+    @field_validator("purpose")
+    @classmethod
+    def valid_purpose(cls, v: str) -> str:
+        allowed = {"interview", "quiz", "a_to_z"}
+        if v.lower() not in allowed:
+            raise ValueError(f"purpose must be one of: {', '.join(sorted(allowed))}")
+        return v.lower()
+
+    @field_validator("instruction")
+    @classmethod
+    def clean_instruction(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Instruction cannot be empty")
+        return v
+
+
+class ConfirmSyllabusIn(BaseModel):
+    skill_name: str = Field(min_length=1, max_length=200)
+    skill_description: Optional[str] = None
+    topics: list[dict[str, Any]]
+
+    @field_validator("skill_name")
+    @classmethod
+    def clean_skill_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Skill name cannot be empty")
+        return v

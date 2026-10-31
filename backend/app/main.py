@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
-from app.api.routes import admin, auth, dashboard, notes, pdf, personal_notes, search, skills, topics
+from app.api.routes import admin, ai, auth, dashboard, notes, pdf, personal_notes, search, skills, topics
 from app.core.config import settings
 from app.core.exceptions import AppError, ErrorHandlingMiddleware, error_payload
 from app.core.logging import get_logger
@@ -104,6 +104,7 @@ def create_app() -> FastAPI:
     application.include_router(search.router)
     application.include_router(dashboard.router)
     application.include_router(pdf.router)
+    application.include_router(ai.router)
 
     @application.get("/health")
     async def health():

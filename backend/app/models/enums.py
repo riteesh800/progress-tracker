@@ -13,6 +13,7 @@ class ActionType(StrEnum):
     skill_completed = "skill_completed"
     skill_deleted = "skill_deleted"
     pdf_imported = "pdf_imported"
+    ai_generated = "ai_generated"
 
 
 class ImportJobStatus(StrEnum):

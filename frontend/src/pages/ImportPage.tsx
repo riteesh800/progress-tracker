@@ -3,49 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { confirmJob, getJob, patchTree, uploadPdf, type ImportJob, type ProposedNode } from "../api/pdf.api";
 import { ApiError } from "../api/client";
 import { useQueryClient } from "@tanstack/react-query";
-
-function PreviewNode({
-  node,
-  onChange,
-}: {
-  node: ProposedNode;
-  onChange: (n: ProposedNode) => void;
-}) {
-  const kids = node.children ?? [];
-  return (
-    <div className={`node ${node.confidence === "low" ? "low" : ""}`}>
-      <div className="node-head">
-        <input
-          value={node.name}
-          onChange={(e) => onChange({ ...node, name: e.target.value })}
-        />
-        {node.confidence === "low" && <span className="muted">low confidence</span>}
-        <button
-          className="danger"
-          onClick={() => onChange({ ...node, name: "" })}
-        >
-          Clear name
-        </button>
-      </div>
-      {kids.map((c, i) => (
-        <PreviewNode
-          key={i}
-          node={c}
-          onChange={(updated) => {
-            const next = [...kids];
-            next[i] = updated;
-            onChange({ ...node, children: next });
-          }}
-        />
-      ))}
-      <button
-        onClick={() => onChange({ ...node, children: [...kids, { name: "New topic", children: [] }] })}
-      >
-        Add child
-      </button>
-    </div>
-  );
-}
+import { PreviewNode } from "../components/PreviewEditor";
 
 function PdfUploadArt() {
   return (

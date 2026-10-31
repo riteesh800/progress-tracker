@@ -19,6 +19,8 @@ const StreakPage = lazy(() => import("./pages/StreakPage"));
 const ActivityPage = lazy(() => import("./pages/ActivityPage"));
 const MakeNotePage = lazy(() => import("./pages/MakeNotePage"));
 const TrashPage = lazy(() => import("./pages/TrashPage"));
+const GenerateAIPage = lazy(() => import("./pages/GenerateAIPage"));
+const AIPreviewPage = lazy(() => import("./pages/AIPreviewPage"));
 
 function Icon({ d }: { d: string }) {
   return (
@@ -31,6 +33,7 @@ function Icon({ d }: { d: string }) {
 const links = [
   { to: "/", label: "Dashboard", end: true, d: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" },
   { to: "/skills", label: "Skills", end: false, d: "M4 6h16M4 12h16M4 18h10" },
+  { to: "/generate", label: "Generate using AI", end: false, d: "M12 2c0 5 4 9 9 9-5 0-9 4-9 9 0-5-4-9-9-9 5 0 9-4 9-9ZM19 2c0 2 1.5 3.5 3.5 3.5-2 0-3.5 1.5-3.5 3.5 0-2-1.5-3.5-3.5-3.5 2 0 3.5-1.5 3.5-3.5Z" },
   { to: "/import", label: "Import PDF", end: false, d: "M12 4v10m0 0 4-4m-4 4-4-4M5 18h14" },
   { to: "/search", label: "Search", end: true, d: "m20 20-3.5-3.5M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" },
   { to: "/streak", label: "Streak", end: true, d: "M8 20V10m4 10V4m4 16v-6" },
@@ -111,6 +114,8 @@ export default function App() {
         <Route path="/" element={<Shell><DashboardPage /></Shell>} />
         <Route path="/skills" element={<Shell><SkillsPage /></Shell>} />
         <Route path="/skills/:id" element={<Shell><SkillDetailPage /></Shell>} />
+        <Route path="/generate" element={<Shell><GenerateAIPage /></Shell>} />
+        <Route path="/generate/preview" element={<Shell><AIPreviewPage /></Shell>} />
         <Route path="/import" element={<Shell><ImportPage /></Shell>} />
         <Route path="/import/:jobId" element={<Shell><ImportPage /></Shell>} />
         <Route path="/search" element={<Shell><SearchPage /></Shell>} />

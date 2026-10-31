@@ -22,6 +22,8 @@ export function formatActivity(item: ActivityItem): string {
       return `You added the skill "${skill}"`;
     case "pdf_imported":
       return `You imported "${topic}" and created "${skill}"`;
+    case "ai_generated":
+      return `You generated "${skill}" using AI`;
     case "topic_created":
       return `You added "${topic}" to "${parent}"`;
     case "skill_completed":

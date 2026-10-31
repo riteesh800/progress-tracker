@@ -27,6 +27,7 @@ export default defineConfig({
       "/activity": apiProxy(),
       "/dashboard": apiProxy(),
       "/pdf": apiProxy(),
+      "/ai": apiProxy(),
       "/admin": apiProxy(),
       "/health": apiProxy(),
     },
