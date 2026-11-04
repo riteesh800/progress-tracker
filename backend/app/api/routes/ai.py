@@ -23,7 +23,6 @@ from app.schemas import (
     SkillOut,
 )
 from app.services.activity import make_activity
-from app.services.progress import ProgressEngine, load_skill_topics
 from app.services.gemini import MAX_NAME_LEN, MAX_TREE_DEPTH, MAX_TREE_NODES, generate_syllabus, refine_syllabus
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -210,19 +209,16 @@ async def api_confirm_syllabus(
         raise
     await session.refresh(skill)
 
-    topics_list = await load_skill_topics(session, skill.id)
-    engine = ProgressEngine(topics_list)
-    completed, total, percent = engine.skill_progress()
+    total = _count_ai_leaves(topics)
     return SkillOut(
         id=skill.id,
         name=skill.name,
         description=skill.description,
         created_at=skill.created_at,
-        completed_leaves=completed,
+        completed_leaves=0,
         total_leaves=total,
-        percent=percent,
+        percent=0.0,
         empty=total == 0,
         deleted_at=None,
         purge_at=None,
     )
-

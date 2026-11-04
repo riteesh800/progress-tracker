@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -64,10 +64,12 @@ async def create_skill(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    existing = (await session.execute(select(Skill.id).where(Skill.user_id == user.id, Skill.name == body.name))).scalars().first()
+    existing = (
+        await session.execute(select(Skill.id).where(Skill.user_id == user.id, Skill.name == body.name))
+    ).scalars().first()
     if existing:
         raise AppError(409, "skill_exists", "You already have a skill with this name.")
-        
+
     skill = Skill(user_id=user.id, name=body.name, description=body.description)
     session.add(skill)
     try:
@@ -130,7 +132,9 @@ async def patch_skill(
 ):
     skill = await owned_skill(skill_id, user, session)
     if body.name is not None and body.name != skill.name:
-        existing = (await session.execute(select(Skill.id).where(Skill.user_id == user.id, Skill.name == body.name))).scalars().first()
+        existing = (
+            await session.execute(select(Skill.id).where(Skill.user_id == user.id, Skill.name == body.name))
+        ).scalars().first()
         if existing:
             raise AppError(409, "skill_exists", "You already have a skill with this name.")
         skill.name = body.name
@@ -197,7 +201,6 @@ async def delete_skill(
         )
     )
     skill.deleted_at = datetime.now(timezone.utc)
-    from datetime import timedelta
     skill.purge_at = skill.deleted_at + timedelta(days=3)
     await session.commit()
     return {"ok": True}
@@ -209,7 +212,6 @@ async def restore_skill(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    from app.api.deps import owned_skill
     skill = await owned_skill(skill_id, user, session, allow_deleted=True)
     if skill.deleted_at is None:
         raise AppError(400, "not_in_trash", "Skill is not in trash.")
@@ -226,11 +228,10 @@ async def permanent_delete_skill(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    from app.api.deps import owned_skill
     skill = await owned_skill(skill_id, user, session, allow_deleted=True)
     if skill.deleted_at is None:
         raise AppError(400, "not_in_trash", "Cannot permanently delete a skill that is not in trash.")
-    
+
     topic_ids = (
         await session.execute(select(Topic.id).where(Topic.skill_id == skill.id))
     ).scalars().all()
@@ -262,10 +263,11 @@ async def permanent_delete_skill(
     return {"ok": True}
 
 
-def build_tree(engine: ProgressEngine) -> list[TopicNodeOut]:
-    def to_node(topic: Topic) -> TopicNodeOut:
+def build_node(engine: ProgressEngine, topic: Topic, _seen: set[UUID] | None = None) -> TopicNodeOut:
+    if _seen is None:
+        _seen = set()
+    if topic.id in _seen:
         prog = engine.node_progress(topic.id)
-        kids = [to_node(c) for c in engine.children.get(topic.id, [])]
         return TopicNodeOut(
             id=topic.id,
             skill_id=topic.skill_id,
@@ -278,11 +280,30 @@ def build_tree(engine: ProgressEngine) -> list[TopicNodeOut]:
             completed_leaves=prog.completed_leaves,
             total_leaves=prog.total_leaves,
             percent=prog.percent,
-            children=kids,
+            children=[],
         )
+    _seen.add(topic.id)
+    prog = engine.node_progress(topic.id)
+    kids = [build_node(engine, c, _seen) for c in engine.children.get(topic.id, [])]
+    return TopicNodeOut(
+        id=topic.id,
+        skill_id=topic.skill_id,
+        parent_id=topic.parent_id,
+        name=topic.name,
+        description=topic.description,
+        order_index=topic.order_index,
+        is_leaf=prog.is_leaf,
+        is_completed=topic.is_completed if prog.is_leaf else False,
+        completed_leaves=prog.completed_leaves,
+        total_leaves=prog.total_leaves,
+        percent=prog.percent,
+        children=kids,
+    )
 
+
+def build_tree(engine: ProgressEngine) -> list[TopicNodeOut]:
     roots = engine.children.get(None, [])
-    return [to_node(t) for t in roots]
+    return [build_node(engine, t) for t in roots]
 
 
 @router.get("/{skill_id}/topics", response_model=list[TopicNodeOut])

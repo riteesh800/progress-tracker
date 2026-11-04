@@ -1,4 +1,4 @@
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from datetime import datetime, date
 
@@ -6,8 +6,17 @@ from app.models.enums import ActionType
 from app.models import ActivityLog
 
 
+def safe_zoneinfo(tz_name: str | None) -> ZoneInfo:
+    if not tz_name:
+        return ZoneInfo("UTC")
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
 def activity_date_for(occurred_at: datetime, tz_name: str) -> date:
-    tz = ZoneInfo(tz_name)
+    tz = safe_zoneinfo(tz_name)
     if occurred_at.tzinfo is None:
         occurred_at = occurred_at.replace(tzinfo=ZoneInfo("UTC"))
     return occurred_at.astimezone(tz).date()

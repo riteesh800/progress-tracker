@@ -19,24 +19,36 @@ async def search(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
+    q_clean = q.strip()
+    if not q_clean:
+        return []
     bind = session.get_bind()
     dialect = bind.dialect.name if bind is not None else "sqlite"
     if dialect == "postgresql":
-        return await _postgres_search(session, user.id, q)
-    return await _sqlite_search(session, user.id, q)
+        return await _postgres_search(session, user.id, q_clean)
+    return await _sqlite_search(session, user.id, q_clean)
 
 
 async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list[SearchHit]:
     hits: list[SearchHit] = []
+    like = f"%{q}%"
+    params = {"uid": str(user_id), "q": q, "like": like}
     skill_rows = await session.execute(
         text(
             """
             SELECT s.id, s.name, s.description
             FROM skills s
-            WHERE s.user_id = :uid AND s.search_tsv @@ plainto_tsquery('english', :q)
+            WHERE s.user_id = CAST(:uid AS uuid)
+              AND s.deleted_at IS NULL
+              AND (
+                to_tsvector('english', coalesce(s.name, '') || ' ' || coalesce(s.description, ''))
+                  @@ plainto_tsquery('english', :q)
+                OR s.name ILIKE :like
+                OR coalesce(s.description, '') ILIKE :like
+              )
             """
         ),
-        {"uid": str(user_id), "q": q},
+        params,
     )
     for row in skill_rows:
         hits.append(
@@ -54,10 +66,17 @@ async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list
             SELECT t.id, t.name, t.description, t.skill_id
             FROM topics t
             JOIN skills s ON s.id = t.skill_id
-            WHERE s.user_id = :uid AND t.search_tsv @@ plainto_tsquery('english', :q)
+            WHERE s.user_id = CAST(:uid AS uuid)
+              AND s.deleted_at IS NULL
+              AND (
+                to_tsvector('english', coalesce(t.name, '') || ' ' || coalesce(t.description, ''))
+                  @@ plainto_tsquery('english', :q)
+                OR t.name ILIKE :like
+                OR coalesce(t.description, '') ILIKE :like
+              )
             """
         ),
-        {"uid": str(user_id), "q": q},
+        params,
     )
     for row in topic_rows:
         hits.append(
@@ -76,10 +95,17 @@ async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list
             SELECT n.id, n.content, n.topic_id, t.skill_id, t.name AS topic_name
             FROM notes n
             JOIN topics t ON t.id = n.topic_id
-            WHERE n.user_id = :uid AND n.search_tsv @@ plainto_tsquery('english', :q)
+            JOIN skills s ON s.id = t.skill_id
+            WHERE n.user_id = CAST(:uid AS uuid)
+              AND s.deleted_at IS NULL
+              AND (
+                to_tsvector('english', coalesce(n.content, ''))
+                  @@ plainto_tsquery('english', :q)
+                OR n.content ILIKE :like
+              )
             """
         ),
-        {"uid": str(user_id), "q": q},
+        params,
     )
     for row in note_rows:
         hits.append(
@@ -101,6 +127,7 @@ async def _sqlite_search(session: AsyncSession, user_id: UUID, q: str) -> list[S
     skills = await session.execute(
         select(Skill).where(
             Skill.user_id == user_id,
+            Skill.deleted_at.is_(None),
             or_(Skill.name.ilike(like), Skill.description.ilike(like)),
         )
     )
@@ -119,6 +146,7 @@ async def _sqlite_search(session: AsyncSession, user_id: UUID, q: str) -> list[S
         .join(Skill, Skill.id == Topic.skill_id)
         .where(
             Skill.user_id == user_id,
+            Skill.deleted_at.is_(None),
             or_(Topic.name.ilike(like), Topic.description.ilike(like)),
         )
     )
@@ -136,7 +164,12 @@ async def _sqlite_search(session: AsyncSession, user_id: UUID, q: str) -> list[S
     notes = await session.execute(
         select(Note, Topic)
         .join(Topic, Topic.id == Note.topic_id)
-        .where(Note.user_id == user_id, Note.content.ilike(like))
+        .join(Skill, Skill.id == Topic.skill_id)
+        .where(
+            Note.user_id == user_id,
+            Skill.deleted_at.is_(None),
+            Note.content.ilike(like),
+        )
     )
     for note, topic in notes.all():
         hits.append(

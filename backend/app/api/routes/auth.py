@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -199,7 +200,7 @@ async def logout(body: RefreshIn, session: AsyncSession = Depends(get_db)):
 @router.post("/google", response_model=TokenPair)
 async def google_login(request: Request, body: GoogleIn, session: AsyncSession = Depends(get_db)):
     enforce_limit(request, "google", 8, 15 * 60)
-    email, google_id, name = _verify_google(body.id_token)
+    email, google_id, name = await asyncio.to_thread(_verify_google, body.id_token)
     result = await session.execute(select(User).where(User.email == email.lower()))
     user = result.scalar_one_or_none()
     if user:
@@ -212,8 +213,12 @@ async def google_login(request: Request, body: GoogleIn, session: AsyncSession =
                 # Re-create as new account below
                 user = None
             else:
+                if not user.is_active:
+                    raise AppError(401, "inactive", "Account is inactive.")
                 await _cancel_pending_deletion(user, session)
         else:
+            if not user.is_active:
+                raise AppError(401, "inactive", "Account is inactive.")
             user.last_active_at = datetime.now(timezone.utc)
         if user is not None:
             if not user.google_id:
@@ -284,6 +289,10 @@ async def forgot_password(request: Request, body: ForgotPasswordIn, session: Asy
     enforce_limit(request, "forgot", 5, 15 * 60)
     result = await session.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
+    if user is not None and user.deletion_requested_at is not None and _is_deletion_expired(user):
+        await _permanently_delete_user(user.id, session)
+        await session.commit()
+        user = None
     if user is None:
         raise AppError(404, "email_not_registered", "This email is not registered. Please register an account first.")
     if not user.password_hash:
@@ -310,6 +319,10 @@ async def verify_reset_code(request: Request, body: VerifyResetIn, session: Asyn
     enforce_limit(request, "verify-reset", 8, 15 * 60)
     result = await session.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
+    if user is not None and user.deletion_requested_at is not None and _is_deletion_expired(user):
+        await _permanently_delete_user(user.id, session)
+        await session.commit()
+        user = None
     if user is None:
         raise AppError(400, "invalid_reset", "Invalid or expired reset code.")
     await _unused_reset_row(session, user, body.code)
@@ -321,12 +334,23 @@ async def reset_password(request: Request, body: ResetPasswordIn, session: Async
     enforce_limit(request, "reset", 8, 15 * 60)
     result = await session.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
+    if user is not None and user.deletion_requested_at is not None and _is_deletion_expired(user):
+        await _permanently_delete_user(user.id, session)
+        await session.commit()
+        user = None
     if user is None:
         raise AppError(400, "invalid_reset", "Invalid or expired reset code.")
     row = await _unused_reset_row(session, user, body.code)
     row.used = True
+    await session.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used.is_(False))
+        .values(used=True)
+    )
     user.password_hash = hash_password(body.new_password)
     user.must_change_password = False
+    if user.deletion_requested_at is not None:
+        await _cancel_pending_deletion(user, session)
     await session.execute(update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True))
     await session.commit()
     return {"ok": True}

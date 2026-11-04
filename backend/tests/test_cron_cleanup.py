@@ -1,4 +1,4 @@
-"""Tests for the cron-triggered cleanup endpoint POST /admin/cron/cleanup."""
+"""Tests for the cron-triggered cleanup endpoint POST/GET /admin/cron/cleanup."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -163,3 +163,21 @@ async def test_cron_cleanup_does_not_affect_other_users(client, db: AsyncSession
     skills = (await client.get("/skills", headers=auth_header(new_access))).json()
     assert len(skills) == 1
     assert skills[0]["name"] == "B Skill"
+
+
+# ---------- Vercel Cron GET support & CRON_SECRET alias ----------
+
+async def test_cron_cleanup_get_request_succeeds(client):
+    res = await client.get("/admin/cron/cleanup", headers=_cron_headers())
+    assert res.status_code == 200
+    data = res.json()
+    assert data["ok"] is True
+
+
+async def test_cron_cleanup_with_cron_secret_alias(client):
+    from unittest.mock import patch
+    with patch("app.core.config.settings.cleanup_secret", ""), \
+         patch("app.core.config.settings.cron_secret", CLEANUP_SECRET):
+        res = await client.get("/admin/cron/cleanup", headers=_cron_headers())
+        assert res.status_code == 200
+        assert res.json()["ok"] is True

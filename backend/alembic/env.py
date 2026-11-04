@@ -31,7 +31,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+config.set_main_option("sqlalchemy.url", settings.async_database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 
@@ -51,11 +51,11 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     import uuid
     connect_args = {
-        "statement_cache_size": 0, 
+        "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
         "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
-    } if not settings.database_url.startswith("sqlite") else {}
-    
+    } if not settings.is_sqlite else {}
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

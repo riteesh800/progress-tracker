@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+import sys
+import types
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -349,8 +351,6 @@ async def test_gemini_quota_exceeded_error_handling(client: AsyncClient):
             json={"subject": "OS", "depth": "medium", "purpose": "interview"},
             headers=auth_header(token),
         )
-        # Note: Exception in _call_gemini raises directly or via _handle_gemini_error
-        # Here side_effect simulates what calling generate raises
         assert res.status_code in (429, 502)
 
 
@@ -372,7 +372,6 @@ async def test_confirm_empty_topic_name_rejected(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_gemini_fallback_on_model_not_found():
     from app.services.gemini import _call_gemini
-    from unittest.mock import MagicMock
 
     attempts = []
 
@@ -380,12 +379,10 @@ async def test_gemini_fallback_on_model_not_found():
         attempts.append(model_name)
         mock_instance = MagicMock()
         if "gemini-3.8-flash" in model_name:
-            # First attempt fails with 404 / no longer available
             async def fail(*args, **kw):
                 raise Exception("404 This model models/gemini-3.8-flash is no longer available.")
             mock_instance.generate_content_async = fail
         else:
-            # Fallback model succeeds
             async def succeed(*args, **kw):
                 res = MagicMock()
                 res.text = json.dumps(MOCK_VALID_SYLLABUS)
@@ -393,9 +390,109 @@ async def test_gemini_fallback_on_model_not_found():
             mock_instance.generate_content_async = succeed
         return mock_instance
 
-    with patch("app.core.config.settings.gemini_api_key", "test-key"),          patch("app.core.config.settings.gemini_model", "gemini-3.8-flash"),          patch("google.generativeai.GenerativeModel", side_effect=mock_generative_model):
+    import google
+
+    fake_genai = types.ModuleType("google.generativeai")
+    fake_genai.configure = MagicMock()
+    fake_genai.GenerationConfig = MagicMock()
+    fake_genai.GenerativeModel = mock_generative_model
+
+    with patch.dict(sys.modules, {"google.generativeai": fake_genai}), \
+         patch.object(google, "generativeai", fake_genai, create=True), \
+         patch("app.core.config.settings.gemini_api_key", "test-key"), \
+         patch("app.core.config.settings.gemini_model", "gemini-3.8-flash"):
         raw = await _call_gemini("test prompt")
         assert raw is not None
         assert len(attempts) >= 2
         assert "gemini-3.8-flash" in attempts[0]
         assert "gemini-2.5-flash" in attempts[1]
+
+
+@pytest.mark.asyncio
+async def test_soft_deleted_skill_isolated_from_dashboard_search_topics_and_timer(client: AsyncClient):
+    token, _ = await register(client, email="trash_isolation@example.com")
+    # Create skill, topic, note, and timer
+    s_res = await client.post(
+        "/skills",
+        json={"name": "TrashedRust", "description": "Rust programming"},
+        headers=auth_header(token),
+    )
+    assert s_res.status_code == 201
+    skill_id = s_res.json()["id"]
+
+    t_res = await client.post(
+        "/topics",
+        json={"skill_id": skill_id, "name": "BorrowCheckerUnique"},
+        headers=auth_header(token),
+    )
+    assert t_res.status_code == 201
+    topic_id = t_res.json()["id"]
+
+    n_res = await client.post(
+        "/notes",
+        json={"topic_id": topic_id, "content": "LifetimeAnnotationNoteUnique"},
+        headers=auth_header(token),
+    )
+    assert n_res.status_code == 201
+
+    tm_res = await client.post(
+        f"/skills/{skill_id}/timer",
+        json={"from_date": "2026-01-01", "to_date": "2026-02-01"},
+        headers=auth_header(token),
+    )
+    assert tm_res.status_code == 200
+
+    # Move skill to trash
+    del_res = await client.delete(f"/skills/{skill_id}?confirm=true", headers=auth_header(token))
+    assert del_res.status_code == 200
+
+    # Dashboard must not count trashed skills or their leaf topics
+    dash = (await client.get("/dashboard", headers=auth_header(token))).json()
+    assert dash["total_skills"] == 0
+    assert dash["total_topics"] == 0
+
+    # Suggested-next must not suggest trashed skill/topic
+    sug = (await client.get("/dashboard/suggested-next", headers=auth_header(token))).json()
+    assert sug["skill_id"] is None
+    assert sug["topic_id"] is None
+
+    # Search must not return trashed skill, topic, or note
+    for query in ("TrashedRust", "BorrowCheckerUnique", "LifetimeAnnotationNoteUnique"):
+        s_hits = (await client.get(f"/search?q={query}", headers=auth_header(token))).json()
+        assert s_hits == []
+
+    # Topic, note, and timer endpoints must return 404 while skill is in trash
+    assert (await client.get(f"/topics/{topic_id}", headers=auth_header(token))).status_code == 404
+    assert (await client.post(f"/topics/{topic_id}/complete", json={"completed": True}, headers=auth_header(token))).status_code == 404
+    assert (await client.get(f"/notes?topic_id={topic_id}", headers=auth_header(token))).status_code == 404
+    assert (await client.get(f"/skills/{skill_id}/timer", headers=auth_header(token))).status_code == 404
+
+    # Restoring skill makes everything accessible again
+    rest_res = await client.post(f"/skills/{skill_id}/restore", headers=auth_header(token))
+    assert rest_res.status_code == 200
+    dash2 = (await client.get("/dashboard", headers=auth_header(token))).json()
+    assert dash2["total_skills"] == 1
+    assert dash2["total_topics"] == 1
+
+
+@pytest.mark.asyncio
+async def test_vercel_api_prefix_and_supabase_url_normalization(client: AsyncClient):
+    from app.core.config import Settings
+
+    # Verify /api/* prefix middleware works seamlessly for Vercel monorepo routing
+    health_res = await client.get("/api/health")
+    assert health_res.status_code == 200
+    assert health_res.json() == {"status": "ok"}
+
+    token, _ = await register(client, email="vercel_api_prefix@example.com")
+    dash_res = await client.get("/api/dashboard", headers=auth_header(token))
+    assert dash_res.status_code == 200
+    assert dash_res.json()["total_skills"] == 0
+
+    # Verify Supabase pooler URLs with ?pgbouncer=true&sslmode=require are normalized for asyncpg
+    s = Settings(
+        database_url="postgres://postgres.ref:secret@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&supa=base-pooler.x&sslmode=require"
+    )
+    assert s.async_database_url == (
+        "postgresql+asyncpg://postgres.ref:secret@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?ssl=require"
+    )

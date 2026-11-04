@@ -1,14 +1,16 @@
 from typing import Optional
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
-from app.api.deps import get_current_user, get_db
-from app.models import User, Skill, SkillTimer
+from app.api.deps import get_current_user, get_db, owned_skill
+from app.core.exceptions import AppError
+from app.models import User, SkillTimer
 from app.schemas import SkillTimerIn, SkillTimerOut
 
 router = APIRouter()
+
 
 @router.get("/{skill_id}/timer", response_model=Optional[SkillTimerOut])
 async def get_timer(
@@ -16,19 +18,14 @@ async def get_timer(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Verify skill belongs to user
-    stmt = select(Skill).where(Skill.id == skill_id, Skill.user_id == current_user.id)
-    result = await db.execute(stmt)
-    skill = result.scalars().first()
-    if not skill:
-        raise HTTPException(status_code=404, detail="Skill not found")
+    await owned_skill(skill_id, current_user, db)
 
     timer_stmt = select(SkillTimer).where(
         SkillTimer.skill_id == skill_id, SkillTimer.user_id == current_user.id
     )
     timer_result = await db.execute(timer_stmt)
     timer = timer_result.scalars().first()
-    
+
     return timer
 
 
@@ -40,14 +37,9 @@ async def set_timer(
     db: AsyncSession = Depends(get_db),
 ):
     if data.from_date >= data.to_date:
-        raise HTTPException(status_code=400, detail="to_date must be strictly after from_date")
+        raise AppError(400, "invalid_dates", "to_date must be strictly after from_date")
 
-    # Verify skill belongs to user
-    stmt = select(Skill).where(Skill.id == skill_id, Skill.user_id == current_user.id)
-    result = await db.execute(stmt)
-    skill = result.scalars().first()
-    if not skill:
-        raise HTTPException(status_code=404, detail="Skill not found")
+    await owned_skill(skill_id, current_user, db)
 
     # Delete existing timer if any
     del_stmt = delete(SkillTimer).where(
@@ -73,12 +65,7 @@ async def delete_timer(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Verify skill belongs to user
-    stmt = select(Skill).where(Skill.id == skill_id, Skill.user_id == current_user.id)
-    result = await db.execute(stmt)
-    skill = result.scalars().first()
-    if not skill:
-        raise HTTPException(status_code=404, detail="Skill not found")
+    await owned_skill(skill_id, current_user, db)
 
     del_stmt = delete(SkillTimer).where(
         SkillTimer.skill_id == skill_id, SkillTimer.user_id == current_user.id

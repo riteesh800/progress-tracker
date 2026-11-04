@@ -334,6 +334,7 @@ export default function SettingsPage() {
           setAccountBusy(true);
           try {
             await deleteAccount();
+            qc.clear();
             window.location.href = "/login";
           } catch {
             setAccountBusy(false);

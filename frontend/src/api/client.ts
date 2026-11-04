@@ -1,4 +1,5 @@
-export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const rawBase = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/+$/, "");
+export const API_BASE = rawBase || (import.meta.env.PROD ? "/api" : "");
 
 const ACCESS = "pt_access";
 const REFRESH = "pt_refresh";
@@ -16,6 +17,12 @@ export function setTokens(access: string, refresh: string) {
 export function clearTokens() {
   localStorage.removeItem(ACCESS);
   localStorage.removeItem(REFRESH);
+  try {
+    sessionStorage.removeItem("pt_admin_session");
+    sessionStorage.removeItem("pt_ai_draft");
+  } catch {
+    // ignore storage errors
+  }
 }
 
 type ErrorBody = { error?: { message?: string; code?: string } };
@@ -114,17 +121,24 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     wakingCallback?.(false);
   }
 
-  if (res.status === 401 && needsAuth && !options._retried) {
-    const ok = await tryRefresh();
-    if (ok && getAccess()) {
-      return api<T>(path, { ...options, headers: undefined, _retried: true });
+  const data = await parse(res);
+
+  if (res.status === 401) {
+    const err = data as ErrorBody;
+    if (err.error?.code === "admin_locked") {
+      throw new ApiError(401, err.error?.message || "Database Access Code verification is required.", "admin_locked");
     }
-    clearTokens();
-    sendToLogin();
-    throw new ApiError(401, "Session expired. Please log in again.", "unauthenticated");
+    if (needsAuth && !options._retried) {
+      const ok = await tryRefresh();
+      if (ok && getAccess()) {
+        return api<T>(path, { ...options, _retried: true });
+      }
+      clearTokens();
+      sendToLogin();
+      throw new ApiError(401, "Session expired. Please log in again.", "unauthenticated");
+    }
   }
 
-  const data = await parse(res);
   if (!res.ok) {
     const err = data as ErrorBody;
     throw new ApiError(res.status, err.error?.message || "Request failed", err.error?.code);

@@ -43,6 +43,15 @@ class GoogleIn(BaseModel):
     id_token: str
     timezone: str = "UTC"
 
+    @field_validator("timezone")
+    @classmethod
+    def valid_tz(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("Invalid IANA timezone") from exc
+        return v
+
 
 class ForgotPasswordIn(BaseModel):
     email: EmailStr
@@ -117,10 +126,28 @@ class SkillIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
 
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Skill name cannot be empty")
+        return v
+
 
 class SkillUpdateIn(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("Skill name cannot be empty")
+        return v
 
 
 class SkillOut(BaseModel):
@@ -143,6 +170,14 @@ class TopicIn(BaseModel):
     parent_id: Optional[UUID] = None
     name: str = Field(min_length=1, max_length=500)
     description: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Topic name cannot be empty")
+        return v
 
 
 class TopicCompleteIn(BaseModel):

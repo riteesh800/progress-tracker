@@ -163,6 +163,7 @@ class ActivityLog(Base):
     __table_args__ = (
         Index("ix_activity_user_date", "user_id", "activity_date"),
         Index("ix_activity_user_type_date", "user_id", "action_type", "activity_date"),
+        Index("ix_activity_user_occurred", "user_id", "occurred_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { confirmJob, getJob, patchTree, uploadPdf, type ImportJob, type ProposedNode } from "../api/pdf.api";
+import { useNavigate, useParams } from "react-router-dom";
+import { confirmJob, getJob, patchTree, uploadPdf, type ImportJob } from "../api/pdf.api";
 import { ApiError } from "../api/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { PreviewNode } from "../components/PreviewEditor";
@@ -255,16 +255,29 @@ export default function ImportPage() {
 
   async function saveTree() {
     if (!job?.generated_tree_json || !jobId) return;
-    await patchTree(jobId, job.generated_tree_json);
+    setError("");
+    try {
+      await patchTree(jobId, job.generated_tree_json);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not save edits");
+      throw e;
+    }
   }
 
   async function confirm() {
     if (!jobId) return;
-    await saveTree();
-    const done = await confirmJob(jobId, skillName || undefined);
-    qc.invalidateQueries({ queryKey: ["skills"] });
-    qc.invalidateQueries({ queryKey: ["dashboard"] });
-    if (done.skill_id) nav(`/skills/${done.skill_id}`);
+    setError("");
+    try {
+      if (job?.generated_tree_json) {
+        await patchTree(jobId, job.generated_tree_json);
+      }
+      const done = await confirmJob(jobId, skillName || undefined);
+      qc.invalidateQueries({ queryKey: ["skills"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      if (done.skill_id) nav(`/skills/${done.skill_id}`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not confirm import");
+    }
   }
 
   const tree = job?.generated_tree_json;
@@ -307,7 +320,7 @@ export default function ImportPage() {
                 onChange={(n) => setJob({ ...job, generated_tree_json: n })}
               />
               <div className="row" ref={bottomRef}>
-                <button onClick={saveTree}>Save edits</button>
+                <button onClick={() => void saveTree().catch(() => {})}>Save edits</button>
                 <button className="primary" onClick={confirm}>Confirm import</button>
               </div>
             </div>

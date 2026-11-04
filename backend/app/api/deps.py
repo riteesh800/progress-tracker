@@ -43,6 +43,9 @@ def _is_meaningful_activity(request: Request) -> bool:
     if path in _NON_ACTIVITY_PATHS:
         return False
 
+    if request.method == "DELETE" and path.endswith("/auth/me"):
+        return False
+
     # GET requests to data endpoints are typically background refetches
     # Only non-GET requests (POST, PATCH, DELETE, PUT) count as meaningful
     if request.method == "GET":
@@ -92,11 +95,15 @@ async def get_current_user(
 
     # Track meaningful user activity and cancel pending deletion if applicable
     if _is_meaningful_activity(request):
-        if user.deletion_requested_at is not None:
+        was_pending_deletion = user.deletion_requested_at is not None
+        if was_pending_deletion:
             # Cancel pending deletion on meaningful authenticated activity
             user.deletion_requested_at = None
             user.deletion_deadline = None
         user.last_active_at = datetime.now(timezone.utc)
+        if was_pending_deletion:
+            await session.commit()
+            await session.refresh(user)
 
     if user.must_change_password and not _password_change_allowed(request):
         raise AppError(403, "password_change_required", "You must set a new password before continuing.")
@@ -157,12 +164,17 @@ async def owned_skill(skill_id: UUID, user: User, session: AsyncSession, allow_d
     return skill
 
 
-async def owned_topic(topic_id: UUID, user: User, session: AsyncSession) -> Topic:
-    result = await session.execute(
+async def owned_topic(
+    topic_id: UUID, user: User, session: AsyncSession, allow_deleted: bool = False
+) -> Topic:
+    stmt = (
         select(Topic)
         .join(Skill, Skill.id == Topic.skill_id)
         .where(Topic.id == topic_id, Skill.user_id == user.id)
     )
+    if not allow_deleted:
+        stmt = stmt.where(Skill.deleted_at.is_(None))
+    result = await session.execute(stmt)
     topic = result.scalar_one_or_none()
     if topic is None:
         raise AppError(404, "not_found", "Topic not found.")

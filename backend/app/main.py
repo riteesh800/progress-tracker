@@ -22,6 +22,23 @@ import app.models  # noqa: F401 — register metadata
 logger = get_logger(__name__)
 
 
+class StripApiPrefixMiddleware:
+    """Allow routes to be called with or without a leading '/api' prefix on Vercel."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path == "/api":
+                scope = dict(scope, path="/", raw_path=b"/")
+            elif path.startswith("/api/"):
+                new_path = path[4:]
+                scope = dict(scope, path=new_path, raw_path=new_path.encode("latin-1"))
+        await self.app(scope, receive, send)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -63,6 +80,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.add_middleware(GZipMiddleware, minimum_size=500)
+    application.add_middleware(StripApiPrefixMiddleware)
 
     @application.exception_handler(AppError)
     async def app_error_handler(_request: Request, exc: AppError):
@@ -86,7 +104,7 @@ def create_app() -> FastAPI:
         )
 
     @application.exception_handler(RequestValidationError)
-    async def validation_handler(_request: Request, exc: RequestValidationError):
+    async def validation_handler(_request: Request, _exc: RequestValidationError):
         return JSONResponse(
             status_code=422,
             content=error_payload(422, "validation_error", "Invalid request payload."),
@@ -115,7 +133,7 @@ def create_app() -> FastAPI:
     @application.on_event("startup")
     async def startup():
         settings.assert_production_secrets()
-        if settings.database_url.startswith("sqlite"):
+        if settings.is_sqlite:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
 
@@ -143,6 +161,11 @@ def create_app() -> FastAPI:
                         sync_conn.exec_driver_sql(
                             "ALTER TABLE users ADD COLUMN last_active_at DATETIME"
                         )
+                    skill_cols = {row[1] for row in sync_conn.exec_driver_sql("PRAGMA table_info(skills)").fetchall()}
+                    if "deleted_at" not in skill_cols:
+                        sync_conn.exec_driver_sql("ALTER TABLE skills ADD COLUMN deleted_at DATETIME")
+                    if "purge_at" not in skill_cols:
+                        sync_conn.exec_driver_sql("ALTER TABLE skills ADD COLUMN purge_at DATETIME")
 
                 await conn.run_sync(_sqlite_columns)
         logger.info("Skill Progress Tracker API started")

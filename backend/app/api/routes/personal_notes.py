@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ async def _owned_note(note_id: UUID, user: User, session: AsyncSession) -> Perso
         select(PersonalNote)
         .options(selectinload(PersonalNote.tasks))
         .where(PersonalNote.id == note_id, PersonalNote.user_id == user.id)
+        .execution_options(populate_existing=True)
     )
     note = result.scalar_one_or_none()
     if note is None:
@@ -77,9 +78,7 @@ async def patch_personal_note(
     if body.title is not None:
         note.title = (body.title.strip() or "Untitled note")[:35]
     if body.tasks is not None:
-        for task in list(note.tasks):
-            await session.delete(task)
-        await session.flush()
+        await session.execute(delete(PersonalNoteTask).where(PersonalNoteTask.note_id == note.id))
         for index, item in enumerate(body.tasks):
             session.add(
                 PersonalNoteTask(

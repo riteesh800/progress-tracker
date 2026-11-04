@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getTrashSkills, restoreSkill, permanentlyDeleteSkill, Skill } from "../api/skills.api";
+import { getTrashSkills, restoreSkill, permanentlyDeleteSkill } from "../api/skills.api";
+import { ApiError } from "../api/client";
 import Donut from "../components/ProgressVisuals";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { uniqueSkillColor } from "../lib/skillColors";
@@ -28,27 +29,35 @@ export default function TrashPage() {
   const q = useQuery({ queryKey: ["skills-trash"], queryFn: getTrashSkills });
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
 
   const restore = useMutation({
     mutationFn: (id: string) => restoreSkill(id),
     onSuccess: () => {
+      setError("");
       qc.invalidateQueries({ queryKey: ["skills-trash"] });
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["activity"] });
       qc.invalidateQueries({ queryKey: ["streak-calendar"] });
-    }
+    },
+    onError: (e) => {
+      setError(e instanceof ApiError ? e.message : "Could not restore skill.");
+    },
   });
 
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
+    setError("");
     try {
       await permanentlyDeleteSkill(pendingDelete.id);
       setPendingDelete(null);
       qc.invalidateQueries({ queryKey: ["skills-trash"] });
       qc.invalidateQueries({ queryKey: ["activity"] });
       qc.invalidateQueries({ queryKey: ["streak-calendar"] });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not permanently delete skill.");
     } finally {
       setDeleting(false);
     }
@@ -60,6 +69,7 @@ export default function TrashPage() {
   return (
     <div className="grid">
       <h1>Trash</h1>
+      {error && <p className="error">{error}</p>}
       
       {q.data?.length === 0 && (
         <div className="card">Your trash is empty.<br/>No deleted skills.</div>

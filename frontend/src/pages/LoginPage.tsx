@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { login, me, register, resetPassword, verifyResetCode } from "../api/auth.api";
+import { clearAdminToken } from "../api/admin.api";
 import { ApiError } from "../api/client";
 import PasswordField from "../components/PasswordField";
 
@@ -8,6 +10,7 @@ type Mode = "login" | "register" | "forgot" | "verify" | "reset";
 
 export default function LoginPage() {
   const nav = useNavigate();
+  const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +33,16 @@ export default function LoginPage() {
     if (next === "login" || next === "register" || next === "forgot") setCode("");
   }
 
+  function resetSessionCaches() {
+    qc.clear();
+    clearAdminToken();
+    try {
+      sessionStorage.removeItem("pt_ai_draft");
+    } catch {
+      // ignore storage errors
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -43,10 +56,12 @@ export default function LoginPage() {
     setBusy(true);
     try {
       if (mode === "login") {
+        resetSessionCaches();
         await login(email, password);
         const u = await me();
         nav(u.must_change_password ? "/change-password" : "/");
       } else if (mode === "register") {
+        resetSessionCaches();
         await register({ email, password, name, timezone: tz });
         nav("/");
       } else if (mode === "verify") {
@@ -55,6 +70,7 @@ export default function LoginPage() {
         setMode("reset");
       } else {
         await resetPassword(email, code, password);
+        resetSessionCaches();
         await login(email, password);
         const afterReset = await me();
         nav(afterReset.must_change_password ? "/change-password" : "/");
@@ -95,11 +111,11 @@ export default function LoginPage() {
           {mode !== "forgot" && (
           <label>
             Email
-            <input 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              type="email" 
-              required 
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
               autoComplete="email"
               pattern="^[^\s@]+@[gG][mM][aA][iI][lL]\.[cC][oO][mM]$"
             />

@@ -15,7 +15,7 @@ from app.core.exceptions import AppError
 from app.core.logging import get_logger
 from app.core.rate_limit import enforce_limit
 from app.core.security import create_access_token, hash_password
-from app.models import RefreshToken, Skill, User
+from app.models import ActivityLog, ImportJob, RefreshToken, Skill, Topic, User
 from app.schemas import AdminPasswordIn, AdminUnlockIn, AdminUnlockOut, AdminUserOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -125,43 +125,51 @@ async def _run_cleanup(session: AsyncSession) -> int:
     """
     now = datetime.now(timezone.utc)
     result = await session.execute(
-        select(User).where(
+        select(User.id, User.email).where(
             User.deletion_requested_at.is_not(None),
             User.deletion_deadline.is_not(None),
             User.deletion_deadline <= now,
         )
     )
-    expired_users = result.scalars().all()
-    count = 0
-    for user in expired_users:
-        uid = user.id
-        email = user.email
-        await session.execute(delete(User).where(User.id == uid))
-        count += 1
+    expired_rows = result.all()
+    if not expired_rows:
+        return 0
+    uids = [row[0] for row in expired_rows]
+    await session.execute(delete(User).where(User.id.in_(uids)))
+    await session.commit()
+    for uid, email in expired_rows:
         logger.info("Permanently deleted expired account: %s (id=%s)", email, uid)
-    if count > 0:
-        await session.commit()
-    return count
+    return len(uids)
 
 
 async def _run_skill_cleanup(session: AsyncSession) -> int:
     """Permanently delete skills whose purge_at deadline has passed."""
     now = datetime.now(timezone.utc)
     result = await session.execute(
-        select(Skill).where(Skill.purge_at <= now, Skill.deleted_at.is_not(None))
+        select(Skill.id).where(Skill.purge_at <= now, Skill.deleted_at.is_not(None))
     )
-    expired = result.scalars().all()
-    for s in expired:
-        await session.delete(s)
-    if expired:
-        await session.commit()
-        logger.info("Purged %d expired skills from trash", len(expired))
-    return len(expired)
+    skill_ids = list(result.scalars().all())
+    if not skill_ids:
+        return 0
+    topic_subq = select(Topic.id).where(Topic.skill_id.in_(skill_ids))
+    await session.execute(
+        update(ActivityLog).where(ActivityLog.topic_id.in_(topic_subq)).values(topic_id=None)
+    )
+    await session.execute(
+        update(ActivityLog).where(ActivityLog.skill_id.in_(skill_ids)).values(skill_id=None)
+    )
+    await session.execute(
+        update(ImportJob).where(ImportJob.skill_id.in_(skill_ids)).values(skill_id=None)
+    )
+    await session.execute(delete(Skill).where(Skill.id.in_(skill_ids)))
+    await session.commit()
+    logger.info("Purged %d expired skills from trash", len(skill_ids))
+    return len(skill_ids)
 
 
 def _verify_cleanup_secret(authorization: str | None) -> None:
-    """Validate the Bearer token matches the CLEANUP_SECRET env var."""
-    secret = settings.cleanup_secret or ""
+    """Validate the Bearer token matches the CLEANUP_SECRET or CRON_SECRET env var."""
+    secret = settings.effective_cleanup_secret or ""
     if len(secret) < 16:
         raise AppError(503, "cleanup_unconfigured", "Cleanup secret is not configured on the server.")
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -171,14 +179,15 @@ def _verify_cleanup_secret(authorization: str | None) -> None:
         raise AppError(403, "forbidden", "Invalid cleanup secret.")
 
 
-@router.post("/cron/cleanup")
+@router.api_route("/cron/cleanup", methods=["GET", "POST"])
 async def cron_cleanup(
     authorization: str | None = Header(default=None),
     session: AsyncSession = Depends(get_db),
 ):
-    """Endpoint for Render Cron Job to trigger all periodic cleanup tasks.
+    """Endpoint for Vercel Cron or Render Cron to trigger periodic cleanup tasks.
 
-    Secured by CLEANUP_SECRET Bearer token (not admin JWT).
+    Secured by CLEANUP_SECRET or CRON_SECRET Bearer token (not admin JWT).
+    Supports GET (for Vercel Cron) and POST (for Render / external webhooks).
     Idempotent: safe to call multiple times or concurrently.
     """
     _verify_cleanup_secret(authorization)

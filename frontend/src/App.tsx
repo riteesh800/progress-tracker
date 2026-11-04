@@ -1,6 +1,6 @@
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { me, logout } from "./api/auth.api";
 import { getAccess } from "./api/client";
 import { onWaking } from "./api/client";
@@ -47,6 +47,7 @@ function Shell({ children }: { children: ReactNode }) {
   const [waking, setWaking] = useState(false);
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const qc = useQueryClient();
   useEffect(() => onWaking(setWaking), []);
   useEffect(() => {
     setOpen(false);
@@ -88,6 +89,7 @@ function Shell({ children }: { children: ReactNode }) {
             onClick={async () => {
               clearAdminToken();
               await logout();
+              qc.clear();
               window.location.href = "/login";
             }}
           >

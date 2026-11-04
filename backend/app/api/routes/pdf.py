@@ -175,7 +175,9 @@ async def upload_pdf(
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    background.add_task(run_parse_job, job.id, data)
+    # Execute parsing directly so serverless (Vercel) does not freeze background tasks
+    await run_parse_job(job.id, data)
+    await session.refresh(job)
     return job
 
 

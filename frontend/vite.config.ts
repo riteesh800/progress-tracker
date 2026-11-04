@@ -17,6 +17,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      "/api": apiProxy(),
       "/auth": apiProxy(),
       "/skills": apiProxy(),
       "/topics": apiProxy(),

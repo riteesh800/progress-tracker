@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, owned_skill, owned_topic
+from app.api.routes.skills import build_node
 from app.core.exceptions import AppError
 from app.models import Skill, Topic, User
 from app.models.enums import ActionType
@@ -18,7 +19,6 @@ from app.schemas import (
 )
 from app.services.activity import make_activity
 from app.services.progress import ProgressEngine, load_skill_topics
-from app.api.routes.skills import build_tree
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
@@ -31,6 +31,7 @@ async def create_topic(
 ):
     skill = await owned_skill(body.skill_id, user, session)
     parent_name = None
+    parent = None
     if body.parent_id:
         parent = await owned_topic(body.parent_id, user, session)
         if parent.skill_id != skill.id:
@@ -52,11 +53,10 @@ async def create_topic(
     )
     session.add(topic)
     await session.flush()
-    if body.parent_id:
-        parent = await session.get(Topic, body.parent_id)
-        if parent and parent.is_completed:
-            # Leaf became a parent: auto-clear completed status (Part 4.6 / Decision #11)
-            parent.is_completed = False
+    if parent and parent.is_completed:
+        # Leaf became a parent: auto-clear completed status (Part 4.6 / Decision #11)
+        parent.is_completed = False
+        parent.completed_at = None
     session.add(
         make_activity(
             user_id=user.id,
@@ -72,22 +72,18 @@ async def create_topic(
         )
     )
     await session.commit()
-    topics = await load_skill_topics(session, skill.id)
-    engine = ProgressEngine(topics)
-    prog = engine.node_progress(topic.id)
-    t = engine.topics[topic.id]
     return TopicNodeOut(
-        id=t.id,
-        skill_id=t.skill_id,
-        parent_id=t.parent_id,
-        name=t.name,
-        description=t.description,
-        order_index=t.order_index,
-        is_leaf=prog.is_leaf,
-        is_completed=t.is_completed,
-        completed_leaves=prog.completed_leaves,
-        total_leaves=prog.total_leaves,
-        percent=prog.percent,
+        id=topic.id,
+        skill_id=topic.skill_id,
+        parent_id=topic.parent_id,
+        name=topic.name,
+        description=topic.description,
+        order_index=topic.order_index,
+        is_leaf=True,
+        is_completed=False,
+        completed_leaves=0,
+        total_leaves=1,
+        percent=0.0,
         children=[],
     )
 
@@ -100,16 +96,7 @@ async def get_topic(
 ):
     topic = await owned_topic(topic_id, user, session)
     engine = ProgressEngine(await load_skill_topics(session, topic.skill_id))
-    nodes = {n.id: n for n in _flatten(build_tree(engine))}
-    return nodes[topic.id]
-
-
-def _flatten(nodes: list[TopicNodeOut]) -> list[TopicNodeOut]:
-    out = []
-    for n in nodes:
-        out.append(n)
-        out.extend(_flatten(n.children))
-    return out
+    return build_node(engine, engine.topics[topic.id])
 
 
 @router.get("/{topic_id}/children", response_model=list[TopicNodeOut])
@@ -120,8 +107,7 @@ async def children(
 ):
     topic = await owned_topic(topic_id, user, session)
     engine = ProgressEngine(await load_skill_topics(session, topic.skill_id))
-    node = next(n for n in _flatten(build_tree(engine)) if n.id == topic.id)
-    return node.children
+    return [build_node(engine, c) for c in engine.children.get(topic.id, [])]
 
 
 @router.post("/{topic_id}/complete", response_model=TopicNodeOut)
@@ -132,23 +118,24 @@ async def complete_topic(
     session: AsyncSession = Depends(get_db),
 ):
     topic = await owned_topic(topic_id, user, session)
-    engine = ProgressEngine(await load_skill_topics(session, topic.skill_id))
+    topics = await load_skill_topics(session, topic.skill_id)
+    engine = ProgressEngine(topics)
     if not engine.is_leaf(topic.id):
         raise AppError(422, "not_a_leaf", "Only leaf topics can be marked complete.")
-    if body.completed and topic.is_completed:
-        return await get_topic(topic_id, user, session)
-    if not body.completed and not topic.is_completed:
-        return await get_topic(topic_id, user, session)
+    if body.completed == topic.is_completed:
+        return build_node(engine, engine.topics[topic.id])
+    now = datetime.now(timezone.utc)
+    skill = await session.get(Skill, topic.skill_id)
+    skill_name = skill.name if skill else "Unknown skill"
     if body.completed:
         topic.is_completed = True
-        topic.completed_at = datetime.now(timezone.utc)
-        skill = await session.get(Skill, topic.skill_id)
-        skill_name = skill.name if skill else "Unknown skill"
+        topic.completed_at = now
+        engine.topics[topic.id].is_completed = True
         session.add(
             make_activity(
                 user_id=user.id,
                 action_type=ActionType.topic_completed,
-                occurred_at=datetime.now(timezone.utc),
+                occurred_at=now,
                 timezone_name=user.timezone,
                 topic_id=topic.id,
                 skill_id=topic.skill_id,
@@ -157,15 +144,14 @@ async def complete_topic(
                 summary=f'You completed "{topic.name}" in "{skill_name}"',
             )
         )
-        await session.flush()
-        engine_after = ProgressEngine(await load_skill_topics(session, topic.skill_id))
+        engine_after = ProgressEngine(list(engine.topics.values()))
         completed, total, _pct = engine_after.skill_progress()
         if total > 0 and completed == total:
             session.add(
                 make_activity(
                     user_id=user.id,
                     action_type=ActionType.skill_completed,
-                    occurred_at=datetime.now(timezone.utc),
+                    occurred_at=now,
                     timezone_name=user.timezone,
                     skill_id=topic.skill_id,
                     skill_name_snapshot=skill_name,
@@ -174,13 +160,14 @@ async def complete_topic(
             )
     else:
         topic.is_completed = False
-        skill = await session.get(Skill, topic.skill_id)
-        skill_name = skill.name if skill else "Unknown skill"
+        topic.completed_at = None
+        engine.topics[topic.id].is_completed = False
+        engine_after = ProgressEngine(list(engine.topics.values()))
         session.add(
             make_activity(
                 user_id=user.id,
                 action_type=ActionType.topic_uncompleted,
-                occurred_at=datetime.now(timezone.utc),
+                occurred_at=now,
                 timezone_name=user.timezone,
                 topic_id=topic.id,
                 skill_id=topic.skill_id,
@@ -190,5 +177,4 @@ async def complete_topic(
             )
         )
     await session.commit()
-    return await get_topic(topic_id, user, session)
-
+    return build_node(engine_after, engine_after.topics[topic.id])

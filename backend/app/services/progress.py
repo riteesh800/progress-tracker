@@ -43,24 +43,58 @@ class ProgressEngine:
             self.children[t.parent_id].append(t)
         for siblings in self.children.values():
             siblings.sort(key=lambda x: (x.order_index, str(x.id)))
+        self._counts_cache: dict[UUID, tuple[int, int]] = {}
+        self._leaves_cache: dict[UUID, list[Topic]] = {}
 
     def is_leaf(self, topic_id: UUID) -> bool:
         return len(self.children.get(topic_id, [])) == 0
 
-    def descendant_leaves(self, topic_id: UUID) -> list[Topic]:
+    def descendant_leaves(self, topic_id: UUID, _seen: set[UUID] | None = None) -> list[Topic]:
+        cached = self._leaves_cache.get(topic_id)
+        if cached is not None:
+            return cached
+        if _seen is None:
+            _seen = set()
+        if topic_id in _seen:
+            return []
+        _seen.add(topic_id)
         node = self.topics[topic_id]
         kids = self.children.get(topic_id, [])
         if not kids:
-            return [node]
-        leaves: list[Topic] = []
-        for child in kids:
-            leaves.extend(self.descendant_leaves(child.id))
-        return leaves
+            res = [node]
+        else:
+            res: list[Topic] = []
+            for child in kids:
+                res.extend(self.descendant_leaves(child.id, _seen))
+        self._leaves_cache[topic_id] = res
+        return res
+
+    def _leaf_counts(self, topic_id: UUID, _seen: set[UUID] | None = None) -> tuple[int, int]:
+        cached = self._counts_cache.get(topic_id)
+        if cached is not None:
+            return cached
+        if _seen is None:
+            _seen = set()
+        if topic_id in _seen:
+            return (0, 0)
+        _seen.add(topic_id)
+        kids = self.children.get(topic_id, [])
+        if not kids:
+            node = self.topics[topic_id]
+            res = (1 if node.is_completed else 0, 1)
+        else:
+            comp = 0
+            tot = 0
+            for child in kids:
+                c, t = self._leaf_counts(child.id, _seen)
+                comp += c
+                tot += t
+            res = (comp, tot)
+        self._counts_cache[topic_id] = res
+        return res
 
     def node_progress(self, topic_id: UUID) -> NodeProgress:
-        leaves = self.descendant_leaves(topic_id)
-        total = len(leaves)
-        completed = sum(1 for leaf in leaves if leaf.is_completed)
+        completed, total = self._leaf_counts(topic_id)
         leaf = self.is_leaf(topic_id)
         return NodeProgress(
             topic_id=topic_id,
@@ -72,9 +106,13 @@ class ProgressEngine:
         )
 
     def skill_progress(self) -> tuple[int, int, float]:
-        leaves = [t for t in self.topics.values() if self.is_leaf(t.id)]
-        total = len(leaves)
-        completed = sum(1 for t in leaves if t.is_completed)
+        total = 0
+        completed = 0
+        for tid, t in self.topics.items():
+            if self.is_leaf(tid):
+                total += 1
+                if t.is_completed:
+                    completed += 1
         return completed, total, _percent(completed, total)
 
     def would_create_cycle(self, topic_id: UUID, new_parent_id: UUID | None) -> bool:

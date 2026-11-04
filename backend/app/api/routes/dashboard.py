@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -11,6 +10,7 @@ from app.api.deps import get_current_user, get_db
 from app.models import ActivityLog, Skill, Topic, User
 from app.models.enums import ActionType
 from app.schemas import ActivityOut, DashboardOut, StreakCalendarOut, StreakDayOut, StreakOut, SuggestedNextOut
+from app.services.activity import safe_zoneinfo
 from app.services.progress import ProgressEngine, load_user_topics_grouped, streak_for_user
 
 router = APIRouter(tags=["dashboard"])
@@ -21,7 +21,7 @@ async def get_streak(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    today = datetime.now(timezone.utc).astimezone(ZoneInfo(user.timezone)).date()
+    today = datetime.now(timezone.utc).astimezone(safe_zoneinfo(user.timezone)).date()
     current, longest = await streak_for_user(session, user.id, today)
     return StreakOut(current_streak=current, longest_streak=longest)
 
@@ -31,7 +31,7 @@ async def streak_calendar(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    today = datetime.now(timezone.utc).astimezone(ZoneInfo(user.timezone)).date()
+    today = datetime.now(timezone.utc).astimezone(safe_zoneinfo(user.timezone)).date()
     start = today - timedelta(days=364)
     rows = await session.execute(
         select(ActivityLog.activity_date, func.count())
@@ -85,21 +85,29 @@ async def dashboard(
     session: AsyncSession = Depends(get_db),
 ):
     total_skills = (
-        await session.execute(select(func.count()).select_from(Skill).where(Skill.user_id == user.id))
+        await session.execute(
+            select(func.count())
+            .select_from(Skill)
+            .where(Skill.user_id == user.id, Skill.deleted_at.is_(None))
+        )
     ).scalar_one()
-    # Leaf topics: topics with no children, owned via skill.user_id
+    # Leaf topics: topics with no children, owned via non-deleted skill.user_id
     child = Topic.__table__.alias("child")
     leaf_q = (
         select(Topic.id, Topic.is_completed)
         .join(Skill, Skill.id == Topic.skill_id)
         .outerjoin(child, child.c.parent_id == Topic.id)
-        .where(Skill.user_id == user.id, child.c.id.is_(None))
+        .where(
+            Skill.user_id == user.id,
+            Skill.deleted_at.is_(None),
+            child.c.id.is_(None),
+        )
     )
     leaves = (await session.execute(leaf_q)).all()
     completed_leaves = sum(1 for _, done in leaves if done)
     total_leaves = len(leaves)
     overall = 0.0 if total_leaves == 0 else round(completed_leaves / total_leaves * 100, 2)
-    today = datetime.now(timezone.utc).astimezone(ZoneInfo(user.timezone)).date()
+    today = datetime.now(timezone.utc).astimezone(safe_zoneinfo(user.timezone)).date()
     current, longest = await streak_for_user(session, user.id, today)
     return DashboardOut(
         total_skills=total_skills,
@@ -119,7 +127,9 @@ async def suggested_next(
 ):
     """Oldest incomplete leaf by tree order (DECISIONS.md)."""
     result = await session.execute(
-        select(Skill).where(Skill.user_id == user.id).order_by(Skill.created_at.asc())
+        select(Skill)
+        .where(Skill.user_id == user.id, Skill.deleted_at.is_(None))
+        .order_by(Skill.created_at.asc())
     )
     skills = list(result.scalars().all())
     # Batch-load all topics in one query instead of N+1
