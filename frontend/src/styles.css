@@ -539,19 +539,22 @@ input[type="checkbox"] {
 
 /* Import PDF page */
 .import-page {
-  max-width: 760px;
   width: 100%;
-  margin: 0 auto;
 }
 .import-page-header {
-  text-align: center;
+  text-align: left;
   display: grid;
   gap: 0.35rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
 }
 .import-page-header h1 {
   margin: 0;
   font-size: 1.65rem;
+}
+.import-content-wrap {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
 }
 .import-upload-card {
   background: var(--card);

@@ -287,14 +287,14 @@ export default function ImportPage() {
       </div>
 
       {showUploadHome && (
-        <>
+        <div className="grid import-content-wrap">
           <UploadCard onFile={onFile} uploading={uploading} error={error} />
           <PdfGuide />
-        </>
+        </div>
       )}
 
       {jobId && (
-        <div className="grid">
+        <div className="grid import-content-wrap">
           {statusMsg && <div className="card">{statusMsg}</div>}
           {error && <p className="error">{error}</p>}
           {job?.status === "failed" && <p className="error">{job.error_message}</p>}
