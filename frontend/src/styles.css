@@ -1091,7 +1091,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* Page container */
 .generate-ai-page {
-  max-width: 900px;
+  width: 100%;
+  max-width: none;
   gap: 1.25rem;
 }
 .generate-ai-header {
@@ -1105,15 +1106,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* Form card & fields */
 .generate-form-card {
-  padding: 1.35rem 1.45rem;
-  gap: 1.5rem;
+  padding: 2rem 2.25rem;
+  gap: 2rem;
+  min-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
 }
 .generate-field {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.55rem;
 }
 .generate-label {
-  font-size: 0.96rem;
+  font-size: 1rem;
   font-weight: 500;
   color: var(--text);
   display: flex;
@@ -1125,9 +1129,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .generate-hint,
 .generate-field-sub {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   margin: 0;
   line-height: 1.4;
+}
+
+#ai-subject-input {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
 }
 
 /* Syllabus Depth 4-column Grid */
@@ -1203,14 +1212,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
+  right: 0;
   width: 100%;
   min-width: 220px;
-  max-width: 320px;
   z-index: 50;
   background: #11181f;
   border: 1px solid rgba(94, 234, 212, 0.4);
   border-radius: 12px;
-  padding: 0.85rem 0.95rem;
+  padding: 0.95rem 1.05rem;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(94, 234, 212, 0.15);
   text-align: left;
   animation: popoverFadeIn 0.2s ease-out;
@@ -1321,7 +1330,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   flex-direction: column;
   gap: 0.65rem;
   align-items: flex-start;
-  margin-top: 0.5rem;
+  margin-top: auto;
+  padding-top: 1.25rem;
 }
 .generate-submit-btn {
   min-height: 2.85rem;
@@ -1384,6 +1394,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   .generate-form-card {
     padding: 1.1rem;
+    min-height: auto;
   }
   .generate-submit-btn {
     width: 100%;
