@@ -1794,3 +1794,127 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   Search Page (Google-style Pill/Cylindrical Search Bar)
+   ========================================================================== */
+
+.search-page {
+  max-width: 900px;
+  width: 100%;
+  gap: 1.25rem;
+}
+
+.search-form {
+  width: 100%;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: #11181f;
+  border: 1px solid var(--line);
+  border-radius: 9999px; /* Cylindrical ends on both sides */
+  padding: 0.45rem 1.25rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  min-height: 50px;
+}
+
+.search-bar:hover {
+  background: #151f28;
+  border-color: rgba(94, 234, 212, 0.45);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.search-bar:focus-within {
+  background: #151f28;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.search-icon {
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--muted);
+  flex-shrink: 0;
+  margin-right: 0.75rem;
+}
+
+.search-bar .search-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: var(--text);
+  font-size: 1.05rem;
+  padding: 0.55rem 0;
+  min-width: 0;
+}
+
+.search-bar .search-input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.search-clear-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--muted);
+  font-size: 1rem;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  border-radius: 50%;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.search-clear-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: none !important;
+}
+
+.search-results {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.search-hit-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.25rem;
+  background: #11181f;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.search-hit-kind {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+.search-hit-title {
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.search-hit-snippet {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.search-hit-btn {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+}
