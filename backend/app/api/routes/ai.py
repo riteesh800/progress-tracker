@@ -124,7 +124,7 @@ async def api_generate_syllabus(
     session: AsyncSession = Depends(get_db),
 ):
     """Generate a structured syllabus using Gemini. Nothing is saved to the database."""
-    enforce_limit(request, "ai_generate", 15, 3600)
+    enforce_limit(request, "ai_generate", 40, 3600)
     await session.commit()
     await session.close()
     result = await generate_syllabus(body.subject, body.depth, body.purpose)
@@ -139,7 +139,7 @@ async def api_refine_syllabus(
     session: AsyncSession = Depends(get_db),
 ):
     """Refine an existing syllabus tree using Gemini. Nothing is saved to the database."""
-    enforce_limit(request, "ai_refine", 30, 3600)
+    enforce_limit(request, "ai_refine", 60, 3600)
     await session.commit()
     await session.close()
     result = await refine_syllabus(
@@ -161,7 +161,7 @@ async def api_confirm_syllabus(
     session: AsyncSession = Depends(get_db),
 ):
     """Confirm and save an AI-generated syllabus as a new Skill with Topics."""
-    enforce_limit(request, "ai_confirm", 10, 3600)
+    enforce_limit(request, "ai_confirm", 30, 3600)
 
     topics = _sanitize_ai_nodes(body.topics, depth=0)
     if not topics:

@@ -499,19 +499,20 @@ async def test_vercel_api_prefix_and_supabase_url_normalization(client: AsyncCli
 
 
 @pytest.mark.asyncio
-async def test_gemini_rest_thinking_budget_and_fallback():
-    from app.services.gemini import _call_gemini
+async def test_gemini_rest_thinking_level_and_fallback():
+    from app.services.gemini import _call_gemini, _handle_gemini_error
+    from app.core.exceptions import AppError
 
     calls: list[tuple[str, dict]] = []
 
     async def fake_post(self, url: str, *, headers=None, json=None, timeout=None):
         calls.append((url, json or {}))
         resp = MagicMock()
-        if "gemini-2.5-flash:" in url:
-            resp.status_code = 429
-            resp.text = '{"error": {"code": 429, "message": "Resource exhausted", "status": "RESOURCE_EXHAUSTED"}}'
+        if "gemini-3.8-flash:" in url:
+            resp.status_code = 503
+            resp.text = '{"error": {"code": 503, "message": "This model is currently experiencing high demand.", "status": "UNAVAILABLE"}}'
             resp.json.return_value = {
-                "error": {"code": 429, "message": "Resource exhausted", "status": "RESOURCE_EXHAUSTED"}
+                "error": {"code": 503, "message": "This model is currently experiencing high demand.", "status": "UNAVAILABLE"}
             }
             return resp
         resp.status_code = 200
@@ -532,15 +533,25 @@ async def test_gemini_rest_thinking_budget_and_fallback():
 
     with patch("httpx.AsyncClient.post", new=fake_post), \
          patch("app.core.config.settings.gemini_api_key", "test-rest-key"), \
-         patch("app.core.config.settings.gemini_model", "gemini-3.8-flash"):
+         patch("app.core.config.settings.gemini_model", "gemini-2.5-flash"):
         raw = await _call_gemini("Generate OS syllabus")
         assert '"skill_name":"OS"' in raw
         assert len(calls) == 2
-        # gemini-3.8-flash is mapped directly to gemini-2.5-flash on the first attempt with thinkingBudget=0
-        assert "gemini-2.5-flash:generateContent" in calls[0][0]
-        assert calls[0][1]["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
-        # On 429 from gemini-2.5-flash, falls back to gemini-2.5-flash-lite
-        assert "gemini-2.5-flash-lite:generateContent" in calls[1][0]
+        # Retired gemini-2.5-flash is mapped directly to gemini-3.8-flash with thinkingLevel="LOW"
+        assert "gemini-3.8-flash:generateContent" in calls[0][0]
+        assert calls[0][1]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "LOW"}
+        # On 503 from gemini-3.8-flash, falls back to gemini-3.5-flash-lite
+        assert "gemini-3.5-flash-lite:generateContent" in calls[1][0]
+
+    # Verify "generateContent" in 404 message does NOT falsely trigger 429 rate-limit due to "rate" substring
+    with pytest.raises(AppError) as exc_info:
+        _handle_gemini_error(
+            RuntimeError(
+                "404 NOT_FOUND: models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent."
+            )
+        )
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.code == "ai_model_unavailable"
 
 
 def test_truncated_json_auto_repair():

@@ -20,9 +20,20 @@ MAX_NAME_LEN = 500
 
 # Total wall-clock budget (seconds) so serverless functions never hit Vercel's 60s hard kill
 TOTAL_GENERATION_BUDGET_S = 46.0
-PER_ATTEMPT_TIMEOUT_S = 26.0
+PER_ATTEMPT_TIMEOUT_S = 22.0
 
 GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+# Retired model IDs mapped to their current Google AI Studio replacements
+_RETIRED_MODEL_MAP = {
+    "": "gemini-3.8-flash",
+    "gemini-1.5-flash": "gemini-3.8-flash",
+    "gemini-1.5-pro": "gemini-3.8-flash",
+    "gemini-2.0-flash": "gemini-3.8-flash",
+    "gemini-2.0-flash-lite": "gemini-3.5-flash-lite",
+    "gemini-2.5-flash": "gemini-3.8-flash",
+    "gemini-2.5-flash-lite": "gemini-3.5-flash-lite",
+}
 
 DEPTH_DESCRIPTIONS = {
     "easy": (
@@ -353,7 +364,15 @@ def _handle_gemini_error(exc: Exception) -> None:
         raise AppError(
             503, "ai_config_error", "AI service configuration error. Please contact the administrator."
         )
-    if "quota" in exc_str or "resource_exhausted" in exc_str or "rate" in exc_str or "429" in exc_str:
+    # Note: never check bare '"rate" in exc_str' because "generatecontent" contains "rate"!
+    if (
+        "quota" in exc_str
+        or "resource_exhausted" in exc_str
+        or "rate limit" in exc_str
+        or "rate_limit" in exc_str
+        or "too many requests" in exc_str
+        or "429" in exc_str
+    ):
         raise AppError(
             429, "ai_rate_limited", "AI generation rate limit or quota exceeded. Please wait a moment and try again."
         )
@@ -361,7 +380,13 @@ def _handle_gemini_error(exc: Exception) -> None:
         raise AppError(
             503,
             "ai_model_unavailable",
-            "The requested AI model is unavailable. Please set GEMINI_MODEL to gemini-2.5-flash.",
+            "The requested AI model is unavailable. Please set GEMINI_MODEL to gemini-3.8-flash.",
+        )
+    if "high demand" in exc_str or "overloaded" in exc_str or "503" in exc_str or "unavailable" in exc_str:
+        raise AppError(
+            503,
+            "ai_overloaded",
+            "The AI model is temporarily experiencing high demand. Please try again in a few seconds.",
         )
     if "timeout" in exc_str or "deadline" in exc_str or isinstance(exc, httpx.TimeoutException):
         raise AppError(504, "ai_timeout", "AI generation timed out. Please try again.")
@@ -381,12 +406,12 @@ async def _call_gemini_sdk_mock(genai: Any, prompt: str, *, temperature: float =
 
     configured = (settings.gemini_model or "").strip()
     if configured == "gemini-2.0-flash":
-        configured = "gemini-2.5-flash"
+        configured = "gemini-3.8-flash"
 
     candidates: list[str] = []
     if configured:
         candidates.append(configured)
-    for fallback in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"):
+    for fallback in ("gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"):
         if fallback not in candidates:
             candidates.append(fallback)
 
@@ -437,15 +462,68 @@ def _build_candidate_models() -> list[str]:
     configured = (settings.gemini_model or "").strip()
     if configured.startswith("models/"):
         configured = configured[len("models/") :]
-    # Map retired or internal aliases directly to Google AI Studio's fast production Flash model
-    if configured in ("gemini-2.0-flash", "gemini-3.8-flash", ""):
-        configured = "gemini-2.5-flash"
+    # Map retired 1.5 / 2.0 / 2.5 models to their active Gemini 3.x replacements
+    configured = _RETIRED_MODEL_MAP.get(configured, configured)
 
-    candidates: list[str] = [configured]
-    for fallback in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"):
+    candidates: list[str] = []
+    if configured:
+        candidates.append(configured)
+    for fallback in (
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.7-flash",
+    ):
         if fallback not in candidates:
             candidates.append(fallback)
     return candidates
+
+
+def _thinking_configs_for_model(model_name: str) -> list[dict[str, Any] | None]:
+    """Return ordered thinkingConfig options to try for the given model."""
+    lower = model_name.lower()
+    if "lite" in lower:
+        # gemini-3.5-flash-lite defaults to MINIMAL thinking; try without extra config first, or LOW
+        return [None]
+    if "gemini-3" in lower or "gemini-4" in lower:
+        # Gemini 3.x Flash models (e.g. gemini-3.8-flash, gemini-3.7-flash) use thinkingLevel="LOW"
+        # (thinkingBudget is deprecated on Gemini 3+ and returns 400 INVALID_ARGUMENT).
+        return [{"thinkingLevel": "LOW"}, None]
+    if "2.5" in lower:
+        return [{"thinkingBudget": 0}, None]
+    return [None]
+
+
+async def _discover_available_flash_models(client: httpx.AsyncClient, api_key: str) -> list[str]:
+    """Query ListModels as a last-resort fallback if static model IDs return 404."""
+    try:
+        res = await client.get(
+            GEMINI_REST_BASE,
+            headers={"x-goog-api-key": api_key},
+            timeout=httpx.Timeout(connect=4.0, read=5.0, write=4.0, pool=4.0),
+        )
+        if res.status_code != 200:
+            return []
+        models = res.json().get("models") or []
+        flash_models: list[str] = []
+        other_models: list[str] = []
+        for m in models:
+            if not isinstance(m, dict):
+                continue
+            methods = m.get("supportedGenerationMethods") or []
+            if "generateContent" not in methods:
+                continue
+            name = str(m.get("name") or "")
+            if name.startswith("models/"):
+                name = name[len("models/") :]
+            if not name or "tts" in name or "image" in name or "embedding" in name or "vision" in name:
+                continue
+            if "flash" in name:
+                flash_models.append(name)
+            elif "gemini" in name:
+                other_models.append(name)
+        return flash_models + other_models
+    except Exception:
+        return []
 
 
 async def _call_gemini(
@@ -454,7 +532,7 @@ async def _call_gemini(
     temperature: float = 0.7,
     deadline: float | None = None,
 ) -> str:
-    """Low-level async call to Gemini REST API with thinkingBudget=0 and automatic model fallback."""
+    """Low-level async call to Gemini REST API with low thinking latency and automatic model fallback."""
     api_key = (settings.gemini_api_key or "").strip()
     if not api_key:
         raise AppError(
@@ -472,14 +550,25 @@ async def _call_gemini(
         deadline = time.monotonic() + TOTAL_GENERATION_BUDGET_S
 
     candidates = _build_candidate_models()
+    tried: set[str] = set()
     last_exc: Exception | None = None
+    non_404_exc: Exception | None = None
+    discovered = False
+
     headers = {
         "Content-Type": "application/json",
         "x-goog-api-key": api_key,
     }
 
     async with httpx.AsyncClient() as client:
-        for idx, model_name in enumerate(candidates):
+        idx = 0
+        while idx < len(candidates):
+            model_name = candidates[idx]
+            idx += 1
+            if model_name in tried:
+                continue
+            tried.add(model_name)
+
             remaining = deadline - time.monotonic()
             if remaining <= 3.0:
                 break
@@ -488,18 +577,18 @@ async def _call_gemini(
             timeout = httpx.Timeout(connect=5.0, read=read_timeout, write=10.0, pool=5.0)
             url = f"{GEMINI_REST_BASE}/{model_name}:generateContent"
 
-            # Disable thinking tokens on Gemini 2.5+ / 3.x Flash models so structured JSON
-            # is emitted immediately (~3-8s) instead of spending 30-50s thinking.
-            supports_thinking = "2.5" in model_name or "3." in model_name
+            thinking_options = _thinking_configs_for_model(model_name)
 
-            for attempt_thinking in ([True, False] if supports_thinking else [False]):
+            for thinking_cfg in thinking_options:
                 gen_config: dict[str, Any] = {
                     "responseMimeType": "application/json",
-                    "temperature": temperature,
                     "maxOutputTokens": 8192,
                 }
-                if attempt_thinking:
-                    gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+                # gemini-3.5-flash-lite ignores/restricts custom temperature; include for standard models
+                if "lite" not in model_name.lower():
+                    gen_config["temperature"] = temperature
+                if thinking_cfg is not None:
+                    gen_config["thinkingConfig"] = thinking_cfg
 
                 payload = {
                     "systemInstruction": {
@@ -518,10 +607,11 @@ async def _call_gemini(
                     res = await client.post(url, headers=headers, json=payload, timeout=timeout)
                 except Exception as exc:
                     last_exc = exc
+                    non_404_exc = exc
                     logger.warning(
                         "Gemini request error on model '%s': %s",
                         model_name,
-                        exc,
+                        repr(exc),
                     )
                     break  # Try next candidate model if time allows
 
@@ -567,11 +657,19 @@ async def _call_gemini(
                     err_msg = res.text
                     err_status = ""
 
-                # If model rejected thinkingConfig with 400, immediately retry same model without thinkingConfig
-                if res.status_code == 400 and attempt_thinking and "thinking" in err_msg.lower():
+                # If model rejected thinkingConfig or temperature with 400, immediately retry without thinkingConfig
+                if res.status_code == 400 and thinking_cfg is not None:
+                    logger.warning(
+                        "Model '%s' returned 400 with thinkingConfig=%s (%s); retrying without thinkingConfig.",
+                        model_name,
+                        thinking_cfg,
+                        err_msg[:120],
+                    )
                     continue
 
                 last_exc = RuntimeError(f"{res.status_code} {err_status}: {err_msg}")
+                if res.status_code != 404:
+                    non_404_exc = last_exc
                 err_lower = f"{res.status_code} {err_status} {err_msg}".lower()
 
                 # Invalid API key / unauthenticated -> fail immediately, fallback won't help
@@ -582,6 +680,20 @@ async def _call_gemini(
                 ):
                     _handle_gemini_error(last_exc)
 
+                # If 404 error message suggests a replacement model (e.g. "use models/gemini-3.8-flash"),
+                # extract it and queue it immediately!
+                if res.status_code == 404:
+                    for suggested in re.findall(r"models/([a-zA-Z0-9._-]+)", err_msg):
+                        if suggested != model_name and suggested not in tried and suggested not in candidates:
+                            candidates.insert(idx, suggested)
+
+                # If we hit the end of static candidates and only got 404s, query ListModels once
+                if idx >= len(candidates) and non_404_exc is None and not discovered:
+                    discovered = True
+                    for disc_model in await _discover_available_flash_models(client, api_key):
+                        if disc_model not in tried and disc_model not in candidates:
+                            candidates.append(disc_model)
+
                 # Retryable across candidate models: 404 (not found), 429 (per-model quota), 5xx (overloaded)
                 is_fallback_eligible = (
                     res.status_code in (404, 429, 500, 502, 503, 504)
@@ -589,20 +701,20 @@ async def _call_gemini(
                     or "not supported" in err_lower
                     or "no longer available" in err_lower
                 )
-                if is_fallback_eligible and idx + 1 < len(candidates):
+                if is_fallback_eligible and idx < len(candidates):
                     logger.warning(
                         "Gemini model '%s' returned %s (%s). Falling back to '%s'...",
                         model_name,
                         res.status_code,
                         err_msg[:160],
-                        candidates[idx + 1],
+                        candidates[idx],
                     )
                     break  # break inner loop to try next candidate model
 
-                _handle_gemini_error(last_exc)
+                _handle_gemini_error(non_404_exc or last_exc)
 
-    if last_exc:
-        _handle_gemini_error(last_exc)
+    if non_404_exc or last_exc:
+        _handle_gemini_error(non_404_exc or last_exc)  # type: ignore[arg-type]
     raise AppError(504, "ai_timeout", "AI generation timed out. Please try again.")
 
 
