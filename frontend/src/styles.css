@@ -538,7 +538,21 @@ input[type="checkbox"] {
 }
 
 /* Import PDF page */
-.import-page { max-width: 720px; }
+.import-page {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+.import-page-header {
+  text-align: center;
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+.import-page-header h1 {
+  margin: 0;
+  font-size: 1.65rem;
+}
 .import-upload-card {
   background: var(--card);
   border: 1px solid var(--line);

@@ -281,8 +281,10 @@ export default function ImportPage() {
 
   return (
     <div className="grid import-page">
-      <h1>Import PDF</h1>
-      <p className="muted">Every upload creates a brand-new skill after you confirm the preview.</p>
+      <div className="import-page-header">
+        <h1>Import PDF</h1>
+        <p className="muted">Every upload creates a brand-new skill after you confirm the preview.</p>
+      </div>
 
       {showUploadHome && (
         <>
