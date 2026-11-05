@@ -190,13 +190,9 @@ function PdfGuide() {
       <h2 className="import-guide-title">How should your PDF be structured?</h2>
       <div className="card import-guide-card">
         <div className="import-guide-block">
-          <h3>1. Generate your syllabus using ChatGPT or any AI tool</h3>
+          <h3>1. Generate your syllabus using an AI tool</h3>
           <p className="muted">
-            You can use{" "}
-            <a href="https://chatgpt.com/" target="_blank" rel="noreferrer">
-              ChatGPT
-            </a>{" "}
-            or any other AI tool.
+            You can use any AI tool to generate your syllabus.
           </p>
           <CopyablePrompt text={PDF_GUIDE_TEXT} />
         </div>

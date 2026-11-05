@@ -265,7 +265,7 @@ export default function AIPreviewPage() {
           <h1>AI-generated syllabus preview</h1>
           <p className="muted">
             Generated for <strong>{draftState.subject}</strong> ({draftState.depth} depth, {draftState.purpose.replace("_", " ")} purpose).
-            Review, edit manually, or refine with Gemini. Nothing is saved until you confirm.
+            Review, edit manually, or refine with AI. Nothing is saved until you confirm.
           </p>
         </div>
         <div className="ai-preview-top-actions">
@@ -413,7 +413,7 @@ export default function AIPreviewPage() {
             <div className="ai-chat-header">
               <div className="ai-chat-header-title">
                 <span className="ai-chat-sparkle">✦</span>
-                <strong>Refine with Gemini</strong>
+                <strong>Refine with AI</strong>
               </div>
               <button
                 type="button"
@@ -428,7 +428,7 @@ export default function AIPreviewPage() {
 
             <div className="ai-chat-messages-container">
               <div className="ai-chat-welcome muted">
-                <p>Tell Gemini how to adjust your syllabus. For example:</p>
+                <p>Tell AI how to adjust your syllabus. For example:</p>
                 <ul>
                   <li>"Add more advanced concepts to topic 2"</li>
                   <li>"Remove unnecessary beginner topics"</li>
@@ -446,7 +446,7 @@ export default function AIPreviewPage() {
                   }`}
                 >
                   <span className="ai-bubble-sender">
-                    {msg.role === "user" ? "You" : "Gemini"}
+                    {msg.role === "user" ? "You" : "AI"}
                   </span>
                   <div className="ai-bubble-content">{msg.content}</div>
                 </div>
@@ -454,7 +454,7 @@ export default function AIPreviewPage() {
 
               {refining && (
                 <div className="ai-chat-bubble bot-bubble refining-bubble">
-                  <span className="ai-bubble-sender">Gemini</span>
+                  <span className="ai-bubble-sender">AI</span>
                   <div className="ai-bubble-content">
                     <span className="generate-spinner" /> Updating syllabus hierarchy…
                   </div>
@@ -469,7 +469,7 @@ export default function AIPreviewPage() {
               <div className="ai-chat-input-row">
                 <textarea
                   className="ai-chat-textarea"
-                  placeholder="Ask Gemini to add, remove, or modify topics…"
+                  placeholder="Ask AI to add, remove, or modify topics…"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => {

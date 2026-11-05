@@ -145,7 +145,7 @@ export default function GenerateAIPage() {
       <div className="generate-ai-header">
         <h1>Generate using AI</h1>
         <p className="muted">
-          Create a comprehensive, custom-tailored syllabus powered by Google Gemini. Review and refine before saving.
+          Create a comprehensive, custom-tailored syllabus powered by AI. Review and refine before saving.
         </p>
       </div>
 
