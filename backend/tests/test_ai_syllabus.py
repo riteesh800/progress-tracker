@@ -496,3 +496,67 @@ async def test_vercel_api_prefix_and_supabase_url_normalization(client: AsyncCli
     assert s.async_database_url == (
         "postgresql+asyncpg://postgres.ref:secret@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?ssl=require"
     )
+
+
+@pytest.mark.asyncio
+async def test_gemini_rest_thinking_budget_and_fallback():
+    from app.services.gemini import _call_gemini
+
+    calls: list[tuple[str, dict]] = []
+
+    async def fake_post(self, url: str, *, headers=None, json=None, timeout=None):
+        calls.append((url, json or {}))
+        resp = MagicMock()
+        if "gemini-2.5-flash:" in url:
+            resp.status_code = 429
+            resp.text = '{"error": {"code": 429, "message": "Resource exhausted", "status": "RESOURCE_EXHAUSTED"}}'
+            resp.json.return_value = {
+                "error": {"code": 429, "message": "Resource exhausted", "status": "RESOURCE_EXHAUSTED"}
+            }
+            return resp
+        resp.status_code = 200
+        resp.json.return_value = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"thought": True, "text": "internal reasoning"},
+                            {"text": '{"skill_name":"OS","topics":[{"name":"Kernel"}]}'},
+                        ]
+                    },
+                    "finishReason": "STOP",
+                }
+            ]
+        }
+        return resp
+
+    with patch("httpx.AsyncClient.post", new=fake_post), \
+         patch("app.core.config.settings.gemini_api_key", "test-rest-key"), \
+         patch("app.core.config.settings.gemini_model", "gemini-3.8-flash"):
+        raw = await _call_gemini("Generate OS syllabus")
+        assert '"skill_name":"OS"' in raw
+        assert len(calls) == 2
+        # gemini-3.8-flash is mapped directly to gemini-2.5-flash on the first attempt with thinkingBudget=0
+        assert "gemini-2.5-flash:generateContent" in calls[0][0]
+        assert calls[0][1]["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+        # On 429 from gemini-2.5-flash, falls back to gemini-2.5-flash-lite
+        assert "gemini-2.5-flash-lite:generateContent" in calls[1][0]
+
+
+def test_truncated_json_auto_repair():
+    from app.services.gemini import _extract_json, _validate_tree
+
+    truncated = (
+        '{"skill_name":"Distributed Systems","topics":['
+        '{"name":"Consensus","children":[{"name":"Raft"},{"name":"Paxos"}]},'
+        '{"name":"Replication","children":[{"name":"Leader-Follower"},{"name":"Multi-Leader'
+    )
+    extracted = _extract_json(truncated)
+    validated = _validate_tree(extracted)
+    assert validated["skill_name"] == "Distributed Systems"
+    assert len(validated["topics"]) == 2
+    assert validated["topics"][0]["name"] == "Consensus"
+    assert [c["name"] for c in validated["topics"][0]["children"]] == ["Raft", "Paxos"]
+    assert validated["topics"][1]["name"] == "Replication"
+    assert [c["name"] for c in validated["topics"][1]["children"]] == ["Leader-Follower"]
+

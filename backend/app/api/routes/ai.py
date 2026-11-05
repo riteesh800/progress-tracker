@@ -121,10 +121,12 @@ async def api_generate_syllabus(
     request: Request,
     body: GenerateSyllabusIn,
     user: User = Depends(get_current_user),
-    _session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ):
     """Generate a structured syllabus using Gemini. Nothing is saved to the database."""
     enforce_limit(request, "ai_generate", 15, 3600)
+    await session.commit()
+    await session.close()
     result = await generate_syllabus(body.subject, body.depth, body.purpose)
     return result
 
@@ -134,10 +136,12 @@ async def api_refine_syllabus(
     request: Request,
     body: RefineSyllabusIn,
     user: User = Depends(get_current_user),
-    _session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_db),
 ):
     """Refine an existing syllabus tree using Gemini. Nothing is saved to the database."""
     enforce_limit(request, "ai_refine", 30, 3600)
+    await session.commit()
+    await session.close()
     result = await refine_syllabus(
         subject=body.subject,
         depth=body.depth,

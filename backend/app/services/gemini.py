@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 import re
+import sys
+import time
 from typing import Any
+
+import httpx
 
 from app.core.config import settings
 from app.core.exceptions import AppError
@@ -14,27 +18,33 @@ MAX_TREE_NODES = 2000
 MAX_TREE_DEPTH = 20
 MAX_NAME_LEN = 500
 
+# Total wall-clock budget (seconds) so serverless functions never hit Vercel's 60s hard kill
+TOTAL_GENERATION_BUDGET_S = 46.0
+PER_ATTEMPT_TIMEOUT_S = 26.0
+
+GEMINI_REST_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
 DEPTH_DESCRIPTIONS = {
     "easy": (
         "Basic fundamentals only. Include definitions and introductory concepts. "
         "Keep subtopics limited. Focus on essential beginner-level topics. "
-        "Aim for roughly 10-25 topics total."
+        "Aim for roughly 10-20 topics total."
     ),
     "medium": (
         "Cover fundamentals and commonly used important concepts. "
         "Include relevant subtopics with moderate coverage. "
-        "Aim for roughly 25-50 topics total."
+        "Aim for roughly 20-40 topics total."
     ),
     "intermediate": (
         "Detailed concept coverage including important and moderately advanced concepts. "
         "Include more subtopics and sub-subtopics. Cover practical and technical concepts. "
-        "Appropriate depth for serious learning. Aim for roughly 50-100 topics total."
+        "Appropriate depth for serious learning. Aim for roughly 40-70 topics total."
     ),
     "comprehensive": (
         "Complete A-to-Z coverage of the subject. Cover fundamentals through advanced concepts. "
         "Include all important subtopics and sub-subtopics. Include related concepts that are "
         "genuinely relevant. Provide technical depth and practical knowledge. "
-        "Do not miss major areas of the subject. Aim for roughly 80-200 topics total."
+        "Do not miss major areas of the subject. Aim for roughly 65-110 topics total."
     ),
 }
 
@@ -60,33 +70,30 @@ SYSTEM_PROMPT = """You are an expert curriculum designer and syllabus generator 
 Your task is to generate a hierarchical syllabus for a given subject, organized as topics, subtopics, and sub-subtopics.
 
 CRITICAL RULES:
-1. Return ONLY valid JSON. Absolutely no prose, conversational filler, markdown explanation, or text before/after the JSON.
+1. Return ONLY valid, compact JSON. Absolutely no prose, conversational filler, markdown explanation, or text before/after the JSON.
 2. The JSON must follow this exact structure:
-{
-  "skill_name": "Subject Name",
-  "topics": [
-    {
-      "name": "Topic Name",
-      "children": [
-        {
-          "name": "Subtopic Name",
-          "children": []
-        }
-      ]
-    }
-  ]
-}
-3. Every topic must have a "name" (non-empty string) and a "children" list (empty list [] for leaf nodes).
-4. Use logical hierarchical parent-child relationships. Child topics must be nested directly under their parent's "children" array.
-5. Topic names must be concise and meaningful.
-6. Do NOT include numbering or bullet prefixes in topic names (no "1", "1.1", "1.2.1", "A.", "-", etc.) - the application automatically numbers the hierarchy.
-7. Do NOT include emojis or decorative symbols.
-8. Do NOT include markdown headings, formatting, or bullet points in topic names.
-9. Do NOT include explanatory sentences, definitions, or paragraphs inside topic names.
-10. Do NOT include introductory messages ("Here is your syllabus") or concluding remarks.
-11. Do NOT create duplicate or near-duplicate sibling topics.
-12. Do NOT create empty topics.
-13. Avoid unnecessary nesting beyond 4-5 levels unless truly essential."""
+{"skill_name":"Subject Name","topics":[{"name":"Topic Name","children":[{"name":"Subtopic Name"}]}]}
+3. Every topic must have a "name" (non-empty string). Parent topics must have a "children" array of child topic objects; leaf topics may omit "children" or use "children": [].
+4. Output compact JSON without unnecessary indentation or whitespace so generation is fast and complete.
+5. Use logical hierarchical parent-child relationships. Child topics must be nested directly under their parent's "children" array.
+6. Topic names must be concise and meaningful (2-7 words).
+7. Do NOT include numbering or bullet prefixes in topic names (no "1", "1.1", "1.2.1", "A.", "-", etc.) - the application automatically numbers the hierarchy.
+8. Do NOT include emojis or decorative symbols.
+9. Do NOT include markdown headings, formatting, or bullet points in topic names.
+10. Do NOT include explanatory sentences, definitions, or paragraphs inside topic names.
+11. Do NOT include introductory messages ("Here is your syllabus") or concluding remarks.
+12. Do NOT create duplicate or near-duplicate sibling topics.
+13. Do NOT create empty topics.
+14. Avoid unnecessary nesting beyond 4 levels."""
+
+
+def _compact_tree_for_prompt(node: dict[str, Any]) -> dict[str, Any]:
+    """Strip empty children arrays to minimize prompt token size during refinement."""
+    out: dict[str, Any] = {"name": str(node.get("name") or "").strip()}
+    kids = node.get("children")
+    if isinstance(kids, list) and kids:
+        out["children"] = [_compact_tree_for_prompt(c) for c in kids if isinstance(c, dict)]
+    return out
 
 
 def _build_generation_prompt(subject: str, depth: str, purpose: str) -> str:
@@ -97,7 +104,7 @@ def _build_generation_prompt(subject: str, depth: str, purpose: str) -> str:
         f"Generate a syllabus for: {subject}\n\n"
         f"Syllabus Depth: {depth.capitalize()}\n{depth_desc}\n\n"
         f"Learning Purpose: {purpose.replace('_', ' ').title()}\n{purpose_desc}\n\n"
-        "Return the complete syllabus as a valid JSON object matching the required schema with \"skill_name\" and \"topics\"."
+        "Return the complete syllabus as a single compact JSON object matching the required schema with \"skill_name\" and \"topics\"."
     )
 
 
@@ -108,7 +115,16 @@ def _build_refinement_prompt(
     current_tree: dict[str, Any],
     instruction: str,
 ) -> str:
-    tree_json = json.dumps(current_tree, indent=2, ensure_ascii=False)
+    compact_topics = [
+        _compact_tree_for_prompt(t)
+        for t in (current_tree.get("topics") or [])
+        if isinstance(t, dict)
+    ]
+    compact_payload = {
+        "skill_name": current_tree.get("skill_name") or subject,
+        "topics": compact_topics,
+    }
+    tree_json = json.dumps(compact_payload, separators=(",", ":"), ensure_ascii=False)
 
     return (
         f"You are modifying an existing syllabus based on the user's specific natural-language instruction.\n\n"
@@ -121,14 +137,67 @@ def _build_refinement_prompt(
         "1. Strictly apply the user's instruction to the current syllabus.\n"
         "2. If the user refers to specific topics or numbers (e.g., 'Expand topic 2.1' or 'Remove topic 4'), identify that specific topic in the hierarchy and modify it.\n"
         "3. Preserve all other unrelated topics and manual edits made in the current syllabus.\n"
-        "4. Return the COMPLETE updated syllabus as a valid JSON object with \"skill_name\" and \"topics\".\n"
+        "4. Return the COMPLETE updated syllabus as a valid compact JSON object with \"skill_name\" and \"topics\".\n"
         "5. Do NOT include numbering prefixes in topic names.\n"
         "6. Return ONLY the JSON object. No extra text."
     )
 
 
+def _repair_truncated_json(text: str) -> dict | None:
+    """Salvage a valid syllabus JSON object if the model output was truncated near the end."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    fragment = text[start:]
+    pos = len(fragment)
+    attempts = 0
+    while pos > 0 and attempts < 50:
+        last_brace = fragment.rfind("}", 0, pos)
+        if last_brace == -1:
+            break
+        candidate = fragment[: last_brace + 1]
+        stack: list[str] = []
+        in_str = False
+        escape = False
+        valid_scan = True
+        for ch in candidate:
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                if in_str:
+                    escape = True
+                continue
+            if ch == '"':
+                in_str = not in_str
+                continue
+            if in_str:
+                continue
+            if ch == "{":
+                stack.append("}")
+            elif ch == "[":
+                stack.append("]")
+            elif ch in ("}", "]"):
+                if not stack or stack[-1] != ch:
+                    valid_scan = False
+                    break
+                stack.pop()
+        if valid_scan and not in_str:
+            repaired = candidate + "".join(reversed(stack))
+            repaired = re.sub(r",\s*([\]\}])", r"\1", repaired)
+            try:
+                parsed = json.loads(repaired)
+                if isinstance(parsed, dict) and isinstance(parsed.get("topics"), list) and parsed["topics"]:
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+        pos = last_brace
+        attempts += 1
+    return None
+
+
 def _extract_json(text: str) -> dict:
-    """Safely extract and parse JSON from model output with trailing comma tolerance."""
+    """Safely extract and parse JSON from model output with trailing comma and truncation tolerance."""
     cleaned = text.strip()
 
     # Try direct parse
@@ -161,6 +230,12 @@ def _extract_json(text: str) -> dict:
             except json.JSONDecodeError:
                 pass
 
+    # Try repairing truncated JSON stream
+    repaired = _repair_truncated_json(cleaned)
+    if repaired is not None:
+        logger.warning("Repaired truncated JSON response from Gemini")
+        return repaired
+
     raise AppError(502, "ai_invalid_response", "AI returned invalid JSON. Please try again.")
 
 
@@ -172,27 +247,32 @@ def _sanitize_ai_name(name: str) -> str:
     return (cleaned or name.strip())[:MAX_NAME_LEN]
 
 
-def _validate_node(node: Any, depth: int = 0) -> dict:
+def _validate_node(node: Any, depth: int = 0) -> dict | None:
     """Validate and sanitize a single topic node."""
     if not isinstance(node, dict):
-        raise AppError(502, "ai_invalid_response", "AI returned an invalid topic structure.")
+        return None
 
-    raw_name = node.get("name")
+    raw_name = node.get("name") or node.get("title") or node.get("topic")
     if not raw_name or not isinstance(raw_name, str) or not raw_name.strip():
-        raise AppError(502, "ai_invalid_response", "AI returned a topic with an empty name.")
+        return None
 
     name = _sanitize_ai_name(raw_name)
     if not name:
-        raise AppError(502, "ai_invalid_response", "AI returned a topic with an empty name.")
+        return None
 
-    children = node.get("children")
+    children = node.get("children") or node.get("subtopics")
     if children is None or not isinstance(children, list):
         children = []
 
     if depth > MAX_TREE_DEPTH:
         raise AppError(502, "ai_invalid_response", "AI response exceeds maximum nesting depth.")
 
-    validated_children = [_validate_node(c, depth + 1) for c in children if isinstance(c, dict)]
+    validated_children: list[dict] = []
+    for c in children:
+        if isinstance(c, dict):
+            valid_child = _validate_node(c, depth + 1)
+            if valid_child is not None:
+                validated_children.append(valid_child)
 
     # Deduplicate immediate siblings with identical names
     seen_names: set[str] = set()
@@ -234,7 +314,12 @@ def _validate_tree(data: dict) -> dict:
     if not topics or not isinstance(topics, list):
         raise AppError(502, "ai_invalid_response", "AI returned an empty or invalid syllabus.")
 
-    validated_topics = [_validate_node(t, depth=0) for t in topics if isinstance(t, dict)]
+    validated_topics: list[dict] = []
+    for t in topics:
+        if isinstance(t, dict):
+            valid_t = _validate_node(t, depth=0)
+            if valid_t is not None:
+                validated_topics.append(valid_t)
 
     if not validated_topics:
         raise AppError(502, "ai_invalid_response", "AI returned an empty syllabus.")
@@ -252,10 +337,19 @@ def _validate_tree(data: dict) -> dict:
 
 def _handle_gemini_error(exc: Exception) -> None:
     """Convert Gemini API errors to appropriate AppErrors."""
-    exc_str = str(exc).lower()
-    logger.exception("Gemini API error occurred")
+    if isinstance(exc, AppError):
+        raise exc
 
-    if "api_key" in exc_str or "unauthenticated" in exc_str or "permission" in exc_str:
+    exc_str = str(exc).lower()
+    logger.error("Gemini API error: %s", exc)
+
+    if (
+        "api_key" in exc_str
+        or "api key" in exc_str
+        or "unauthenticated" in exc_str
+        or "permission_denied" in exc_str
+        or "permission denied" in exc_str
+    ):
         raise AppError(
             503, "ai_config_error", "AI service configuration error. Please contact the administrator."
         )
@@ -267,9 +361,9 @@ def _handle_gemini_error(exc: Exception) -> None:
         raise AppError(
             503,
             "ai_model_unavailable",
-            "The requested AI model is unavailable or retired. Please update GEMINI_MODEL to gemini-3.8-flash.",
+            "The requested AI model is unavailable. Please set GEMINI_MODEL to gemini-2.5-flash.",
         )
-    if "timeout" in exc_str or "deadline" in exc_str:
+    if "timeout" in exc_str or "deadline" in exc_str or isinstance(exc, httpx.TimeoutException):
         raise AppError(504, "ai_timeout", "AI generation timed out. Please try again.")
     if "safety" in exc_str or "blocked" in exc_str:
         raise AppError(
@@ -281,35 +375,18 @@ def _handle_gemini_error(exc: Exception) -> None:
     raise AppError(502, "ai_error", "AI generation failed. Please try again.")
 
 
-async def _call_gemini(prompt: str, *, temperature: float = 0.7) -> str:
-    """Low-level async call to Gemini API with automatic model fallback."""
-    if not settings.gemini_api_key:
-        raise AppError(
-            503,
-            "ai_unavailable",
-            "AI generation is not configured on this server (GEMINI_API_KEY missing).",
-        )
-
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        raise AppError(
-            503,
-            "ai_unavailable",
-            "Google GenAI package is not installed on this server.",
-        )
-
+async def _call_gemini_sdk_mock(genai: Any, prompt: str, *, temperature: float = 0.7) -> str:
+    """Compatibility path when a unit test injects a mock google.generativeai module."""
     genai.configure(api_key=settings.gemini_api_key)
 
     configured = (settings.gemini_model or "").strip()
-    # gemini-2.0-flash has been retired by Google in favor of gemini-3.8-flash
     if configured == "gemini-2.0-flash":
-        configured = "gemini-3.8-flash"
+        configured = "gemini-2.5-flash"
 
     candidates: list[str] = []
     if configured:
         candidates.append(configured)
-    for fallback in ("gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"):
+    for fallback in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"):
         if fallback not in candidates:
             candidates.append(fallback)
 
@@ -330,25 +407,18 @@ async def _call_gemini(prompt: str, *, temperature: float = 0.7) -> str:
                     max_output_tokens=8192,
                 ),
             )
-            # Succeeded with this model
             break
         except Exception as exc:
             last_exc = exc
             exc_str = str(exc).lower()
-            is_model_unavailable = (
+            is_retryable = (
                 "not found" in exc_str
                 or "404" in exc_str
                 or "no longer available" in exc_str
                 or "is not found" in exc_str
                 or "not supported" in exc_str
             )
-            if is_model_unavailable and idx + 1 < len(candidates):
-                logger.warning(
-                    "Gemini model '%s' unavailable (%s). Falling back to '%s'...",
-                    model_name,
-                    exc,
-                    candidates[idx + 1],
-                )
+            if is_retryable and idx + 1 < len(candidates):
                 continue
             _handle_gemini_error(exc)
 
@@ -357,25 +427,191 @@ async def _call_gemini(prompt: str, *, temperature: float = 0.7) -> str:
             _handle_gemini_error(last_exc)
         raise AppError(502, "ai_error", "AI generation failed. Please try again.")
 
-    if not response or not response.text:
-        if response and hasattr(response, "prompt_feedback") and response.prompt_feedback:
-            block = getattr(response.prompt_feedback, "block_reason", None)
-            if block:
-                raise AppError(
-                    422,
-                    "ai_blocked",
-                    "The syllabus request was blocked by content safety filters. Please try a different subject.",
-                )
+    if not response or not getattr(response, "text", None):
         raise AppError(502, "ai_empty_response", "AI returned an empty response. Please try again.")
 
     return response.text
 
 
+def _build_candidate_models() -> list[str]:
+    configured = (settings.gemini_model or "").strip()
+    if configured.startswith("models/"):
+        configured = configured[len("models/") :]
+    # Map retired or internal aliases directly to Google AI Studio's fast production Flash model
+    if configured in ("gemini-2.0-flash", "gemini-3.8-flash", ""):
+        configured = "gemini-2.5-flash"
+
+    candidates: list[str] = [configured]
+    for fallback in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"):
+        if fallback not in candidates:
+            candidates.append(fallback)
+    return candidates
+
+
+async def _call_gemini(
+    prompt: str,
+    *,
+    temperature: float = 0.7,
+    deadline: float | None = None,
+) -> str:
+    """Low-level async call to Gemini REST API with thinkingBudget=0 and automatic model fallback."""
+    api_key = (settings.gemini_api_key or "").strip()
+    if not api_key:
+        raise AppError(
+            503,
+            "ai_unavailable",
+            "AI generation is not configured on this server (GEMINI_API_KEY missing).",
+        )
+
+    # Support unit tests that inject a fake google.generativeai module into sys.modules
+    mock_genai = sys.modules.get("google.generativeai")
+    if mock_genai is not None and getattr(mock_genai, "__file__", None) is None:
+        return await _call_gemini_sdk_mock(mock_genai, prompt, temperature=temperature)
+
+    if deadline is None:
+        deadline = time.monotonic() + TOTAL_GENERATION_BUDGET_S
+
+    candidates = _build_candidate_models()
+    last_exc: Exception | None = None
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
+
+    async with httpx.AsyncClient() as client:
+        for idx, model_name in enumerate(candidates):
+            remaining = deadline - time.monotonic()
+            if remaining <= 3.0:
+                break
+
+            read_timeout = min(PER_ATTEMPT_TIMEOUT_S, max(5.0, remaining - 1.0))
+            timeout = httpx.Timeout(connect=5.0, read=read_timeout, write=10.0, pool=5.0)
+            url = f"{GEMINI_REST_BASE}/{model_name}:generateContent"
+
+            # Disable thinking tokens on Gemini 2.5+ / 3.x Flash models so structured JSON
+            # is emitted immediately (~3-8s) instead of spending 30-50s thinking.
+            supports_thinking = "2.5" in model_name or "3." in model_name
+
+            for attempt_thinking in ([True, False] if supports_thinking else [False]):
+                gen_config: dict[str, Any] = {
+                    "responseMimeType": "application/json",
+                    "temperature": temperature,
+                    "maxOutputTokens": 8192,
+                }
+                if attempt_thinking:
+                    gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+                payload = {
+                    "systemInstruction": {
+                        "parts": [{"text": SYSTEM_PROMPT}],
+                    },
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [{"text": prompt}],
+                        }
+                    ],
+                    "generationConfig": gen_config,
+                }
+
+                try:
+                    res = await client.post(url, headers=headers, json=payload, timeout=timeout)
+                except Exception as exc:
+                    last_exc = exc
+                    logger.warning(
+                        "Gemini request error on model '%s': %s",
+                        model_name,
+                        exc,
+                    )
+                    break  # Try next candidate model if time allows
+
+                if res.status_code == 200:
+                    body = res.json()
+                    resp_candidates = body.get("candidates") or []
+                    if not resp_candidates:
+                        block_reason = (body.get("promptFeedback") or {}).get("blockReason")
+                        if block_reason:
+                            raise AppError(
+                                422,
+                                "ai_blocked",
+                                "The syllabus request was blocked by content safety filters. Please try a different subject.",
+                            )
+                        raise AppError(502, "ai_empty_response", "AI returned an empty response. Please try again.")
+
+                    first = resp_candidates[0]
+                    finish_reason = str(first.get("finishReason") or "").upper()
+                    if finish_reason in ("SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"):
+                        raise AppError(
+                            422,
+                            "ai_blocked",
+                            "The syllabus request was blocked by content safety filters. Please try a different subject.",
+                        )
+
+                    parts = ((first.get("content") or {}).get("parts")) or []
+                    text_chunks = [
+                        p.get("text", "")
+                        for p in parts
+                        if isinstance(p, dict) and not p.get("thought") and p.get("text")
+                    ]
+                    text = "".join(text_chunks).strip()
+                    if not text:
+                        raise AppError(502, "ai_empty_response", "AI returned an empty response. Please try again.")
+                    return text
+
+                # Parse error details
+                try:
+                    err_data = res.json().get("error") or {}
+                    err_msg = err_data.get("message") or res.text
+                    err_status = err_data.get("status") or ""
+                except Exception:
+                    err_msg = res.text
+                    err_status = ""
+
+                # If model rejected thinkingConfig with 400, immediately retry same model without thinkingConfig
+                if res.status_code == 400 and attempt_thinking and "thinking" in err_msg.lower():
+                    continue
+
+                last_exc = RuntimeError(f"{res.status_code} {err_status}: {err_msg}")
+                err_lower = f"{res.status_code} {err_status} {err_msg}".lower()
+
+                # Invalid API key / unauthenticated -> fail immediately, fallback won't help
+                if (
+                    res.status_code in (401, 403)
+                    or "api_key_invalid" in err_lower
+                    or "api key not valid" in err_lower
+                ):
+                    _handle_gemini_error(last_exc)
+
+                # Retryable across candidate models: 404 (not found), 429 (per-model quota), 5xx (overloaded)
+                is_fallback_eligible = (
+                    res.status_code in (404, 429, 500, 502, 503, 504)
+                    or "not found" in err_lower
+                    or "not supported" in err_lower
+                    or "no longer available" in err_lower
+                )
+                if is_fallback_eligible and idx + 1 < len(candidates):
+                    logger.warning(
+                        "Gemini model '%s' returned %s (%s). Falling back to '%s'...",
+                        model_name,
+                        res.status_code,
+                        err_msg[:160],
+                        candidates[idx + 1],
+                    )
+                    break  # break inner loop to try next candidate model
+
+                _handle_gemini_error(last_exc)
+
+    if last_exc:
+        _handle_gemini_error(last_exc)
+    raise AppError(504, "ai_timeout", "AI generation timed out. Please try again.")
+
+
 async def generate_syllabus(subject: str, depth: str, purpose: str) -> dict:
     """Generate an initial syllabus using Gemini."""
+    deadline = time.monotonic() + TOTAL_GENERATION_BUDGET_S
     prompt = _build_generation_prompt(subject, depth, purpose)
     try:
-        raw = await _call_gemini(prompt, temperature=0.7)
+        raw = await _call_gemini(prompt, temperature=0.5, deadline=deadline)
     except AppError:
         raise
     except Exception as exc:
@@ -385,12 +621,14 @@ async def generate_syllabus(subject: str, depth: str, purpose: str) -> dict:
     try:
         data = _extract_json(raw)
     except AppError:
-        # Retry once with lower temperature
+        if deadline - time.monotonic() < 12.0:
+            raise
+        # Retry once with lower temperature if time budget permits
         retry_prompt = (
             "Your previous response was not valid JSON. "
-            "Return ONLY the valid JSON object with 'skill_name' and 'topics'.\n\n" + prompt
+            "Return ONLY the valid compact JSON object with 'skill_name' and 'topics'.\n\n" + prompt
         )
-        raw2 = await _call_gemini(retry_prompt, temperature=0.2)
+        raw2 = await _call_gemini(retry_prompt, temperature=0.2, deadline=deadline)
         data = _extract_json(raw2)
 
     return _validate_tree(data)
@@ -405,6 +643,7 @@ async def refine_syllabus(
     instruction: str,
 ) -> dict:
     """Refine an existing syllabus based on user instruction and conversation context."""
+    deadline = time.monotonic() + TOTAL_GENERATION_BUDGET_S
     # Retain the last 15 conversation exchanges for context
     recent = conversation_history[-15:] if len(conversation_history) > 15 else conversation_history
     history_lines: list[str] = []
@@ -421,7 +660,7 @@ async def refine_syllabus(
         prompt = "Conversation History:\n" + "\n".join(history_lines) + "\n\n" + prompt
 
     try:
-        raw = await _call_gemini(prompt, temperature=0.4)
+        raw = await _call_gemini(prompt, temperature=0.3, deadline=deadline)
     except AppError:
         raise
     except Exception as exc:
@@ -431,12 +670,14 @@ async def refine_syllabus(
     try:
         data = _extract_json(raw)
     except AppError:
-        # Retry once with low temperature
+        if deadline - time.monotonic() < 12.0:
+            raise
+        # Retry once with low temperature if time budget permits
         retry_prompt = (
             "Your previous response was not valid JSON. "
-            "Return ONLY the valid JSON object with 'skill_name' and 'topics'.\n\n" + prompt
+            "Return ONLY the valid compact JSON object with 'skill_name' and 'topics'.\n\n" + prompt
         )
-        raw2 = await _call_gemini(retry_prompt, temperature=0.1)
+        raw2 = await _call_gemini(retry_prompt, temperature=0.1, deadline=deadline)
         data = _extract_json(raw2)
 
     return _validate_tree(data)

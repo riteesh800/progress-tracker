@@ -32,6 +32,22 @@ async function parse(res: Response) {
   try {
     return text ? JSON.parse(text) : {};
   } catch {
+    if (res.status === 504 || text.includes("FUNCTION_INVOCATION_TIMEOUT")) {
+      return {
+        error: {
+          code: "gateway_timeout",
+          message: "The server timed out while generating the response. Please try again or choose a lighter syllabus depth.",
+        },
+      };
+    }
+    if (res.status >= 500 && (text.includes("FUNCTION_INVOCATION_FAILED") || text.includes("<html") || text.includes("<!DOCTYPE"))) {
+      return {
+        error: {
+          code: "server_error",
+          message: "A temporary server error occurred. Please try again in a moment.",
+        },
+      };
+    }
     return { error: { message: text } };
   }
 }
