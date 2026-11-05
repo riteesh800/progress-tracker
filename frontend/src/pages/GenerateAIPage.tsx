@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { generateSyllabus } from "../api/ai.api";
 import { ApiError } from "../api/client";
@@ -28,7 +28,7 @@ const DEPTH_OPTIONS = [
   },
   {
     key: "intermediate",
-    title: "Intermediate",
+    title: "Hard",
     badge: "In-Depth",
     points: [
       "Detailed concept coverage",
@@ -84,6 +84,69 @@ export default function GenerateAIPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+
+  const [hoveredDepth, setHoveredDepth] = useState<string | null>(null);
+  const [hoveredPurpose, setHoveredPurpose] = useState<string | null>(null);
+
+  const depthTimerRef = useRef<number | null>(null);
+  const purposeTimerRef = useRef<number | null>(null);
+
+  function clearDepthTimer() {
+    if (depthTimerRef.current !== null) {
+      window.clearTimeout(depthTimerRef.current);
+      depthTimerRef.current = null;
+    }
+  }
+
+  function clearPurposeTimer() {
+    if (purposeTimerRef.current !== null) {
+      window.clearTimeout(purposeTimerRef.current);
+      purposeTimerRef.current = null;
+    }
+  }
+
+  function handleDepthEnter(key: string) {
+    clearDepthTimer();
+    depthTimerRef.current = window.setTimeout(() => {
+      setHoveredDepth(key);
+    }, 1500);
+  }
+
+  function handleDepthLeave() {
+    clearDepthTimer();
+    setHoveredDepth(null);
+  }
+
+  function handlePurposeEnter(key: string) {
+    clearPurposeTimer();
+    purposeTimerRef.current = window.setTimeout(() => {
+      setHoveredPurpose(key);
+    }, 1500);
+  }
+
+  function handlePurposeLeave() {
+    clearPurposeTimer();
+    setHoveredPurpose(null);
+  }
+
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest(".generate-card-wrapper")) {
+        clearDepthTimer();
+        clearPurposeTimer();
+        setHoveredDepth(null);
+        setHoveredPurpose(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      clearDepthTimer();
+      clearPurposeTimer();
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
 
   const cleanSubject = subject.trim();
   const isFormValid = cleanSubject.length > 0 && depth && purpose && !loading;
@@ -177,28 +240,46 @@ export default function GenerateAIPage() {
             Syllabus Depth <span className="generate-required">*</span>
           </label>
           <p className="muted generate-field-sub">
-            Controls how deeply topics are broken down into subtopics and sub-subtopics.
+            Controls how deeply topics are broken down into subtopics and sub-subtopics. Hover or hold for &gt;1.5s to view details.
           </p>
           <div className="generate-depth-grid">
             {DEPTH_OPTIONS.map((opt) => (
-              <button
+              <div
                 key={opt.key}
-                type="button"
-                className={`generate-depth-card ${depth === opt.key ? "selected" : ""}`}
-                onClick={() => setDepth(opt.key)}
-                disabled={loading}
-                aria-pressed={depth === opt.key}
+                className="generate-card-wrapper"
+                onMouseEnter={() => handleDepthEnter(opt.key)}
+                onMouseLeave={handleDepthLeave}
+                onTouchStart={() => handleDepthEnter(opt.key)}
+                onTouchEnd={clearDepthTimer}
+                onMouseDown={() => handleDepthEnter(opt.key)}
+                onMouseUp={clearDepthTimer}
               >
-                <div className="generate-card-top">
+                <button
+                  type="button"
+                  className={`generate-depth-card ${depth === opt.key ? "selected" : ""}`}
+                  onClick={() => setDepth(opt.key)}
+                  disabled={loading}
+                  aria-pressed={depth === opt.key}
+                  onFocus={() => handleDepthEnter(opt.key)}
+                  onBlur={handleDepthLeave}
+                >
                   <span className="generate-depth-title">{opt.title}</span>
-                  <span className="generate-depth-badge">{opt.badge}</span>
-                </div>
-                <ul className="generate-points-list">
-                  {opt.points.map((pt, idx) => (
-                    <li key={idx}>{pt}</li>
-                  ))}
-                </ul>
-              </button>
+                </button>
+
+                {hoveredDepth === opt.key && (
+                  <div className="generate-card-popover" role="tooltip">
+                    <div className="generate-card-top">
+                      <span className="generate-depth-title">{opt.title}</span>
+                      <span className="generate-depth-badge">{opt.badge}</span>
+                    </div>
+                    <ul className="generate-points-list">
+                      {opt.points.map((pt, idx) => (
+                        <li key={idx}>{pt}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -209,21 +290,41 @@ export default function GenerateAIPage() {
             Generation Purpose <span className="generate-required">*</span>
           </label>
           <p className="muted generate-field-sub">
-            Directly influences topic focus, problem areas, and sequencing.
+            Directly influences topic focus, problem areas, and sequencing. Hover or hold for &gt;1.5s to view details.
           </p>
           <div className="generate-purpose-grid">
             {PURPOSE_OPTIONS.map((opt) => (
-              <button
+              <div
                 key={opt.key}
-                type="button"
-                className={`generate-purpose-card ${purpose === opt.key ? "selected" : ""}`}
-                onClick={() => setPurpose(opt.key)}
-                disabled={loading}
-                aria-pressed={purpose === opt.key}
+                className="generate-card-wrapper"
+                onMouseEnter={() => handlePurposeEnter(opt.key)}
+                onMouseLeave={handlePurposeLeave}
+                onTouchStart={() => handlePurposeEnter(opt.key)}
+                onTouchEnd={clearPurposeTimer}
+                onMouseDown={() => handlePurposeEnter(opt.key)}
+                onMouseUp={clearPurposeTimer}
               >
-                <div className="generate-purpose-title">{opt.title}</div>
-                <div className="generate-purpose-desc muted">{opt.desc}</div>
-              </button>
+                <button
+                  type="button"
+                  className={`generate-purpose-card ${purpose === opt.key ? "selected" : ""}`}
+                  onClick={() => setPurpose(opt.key)}
+                  disabled={loading}
+                  aria-pressed={purpose === opt.key}
+                  onFocus={() => handlePurposeEnter(opt.key)}
+                  onBlur={handlePurposeLeave}
+                >
+                  <span className="generate-purpose-title">{opt.title}</span>
+                </button>
+
+                {hoveredPurpose === opt.key && (
+                  <div className="generate-card-popover" role="tooltip">
+                    <div className="generate-card-top">
+                      <span className="generate-purpose-title">{opt.title}</span>
+                    </div>
+                    <div className="generate-purpose-desc muted">{opt.desc}</div>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

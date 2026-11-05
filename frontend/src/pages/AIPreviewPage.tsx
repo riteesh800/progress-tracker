@@ -264,7 +264,7 @@ export default function AIPreviewPage() {
         <div>
           <h1>AI-generated syllabus preview</h1>
           <p className="muted">
-            Generated for <strong>{draftState.subject}</strong> ({draftState.depth} depth, {draftState.purpose.replace("_", " ")} purpose).
+            Generated for <strong>{draftState.subject}</strong> ({draftState.depth === "intermediate" ? "hard" : draftState.depth} depth, {draftState.purpose.replace("_", " ")} purpose).
             Review, edit manually, or refine with AI. Nothing is saved until you confirm.
           </p>
         </div>
