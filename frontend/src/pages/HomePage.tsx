@@ -699,11 +699,10 @@ export default function HomePage() {
           ==================================================================== */}
       <header className="home-header">
         <Link to="/" className="home-brand" aria-label="Skill Progress Tracker Home">
-          <div className="home-logo-wrap">
-            <img src="/favicon.png?v=2" alt="Logo" className="home-logo-img" onError={(e) => {
-              // Fallback SVG if image fails
-              (e.currentTarget as HTMLElement).style.display = "none";
-            }} />
+          <div className="home-logo-wrap" title="Skill Progress Tracker">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5eead4" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
           </div>
           <div className="home-brand-text">
             <span className="home-brand-name">Skill Progress Tracker</span>
@@ -712,25 +711,20 @@ export default function HomePage() {
         </Link>
 
         <div className="home-header-actions">
-          {isAuthenticated ? (
-            <>
-              <Link to="/dashboard" className="home-btn-dash">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" />
-                </svg>
-                <span>Dashboard</span>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="home-btn-signin">
-                Sign In
-              </Link>
-              <Link to="/login?mode=register" className="home-btn-signup">
-                Sign Up
-              </Link>
-            </>
+          {isAuthenticated && (
+            <Link to="/dashboard" className="home-btn-dash">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" />
+              </svg>
+              <span>Dashboard</span>
+            </Link>
           )}
+          <Link to="/login" className="home-btn-signin">
+            Sign In
+          </Link>
+          <Link to="/login?mode=register" className="home-btn-signup">
+            Sign Up
+          </Link>
         </div>
       </header>
 
