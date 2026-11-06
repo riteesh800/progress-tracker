@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { forgotPassword, login, me, register, resetPassword, verifyResetCode } from "../api/auth.api";
 import { clearAdminToken } from "../api/admin.api";
@@ -11,7 +11,9 @@ type Mode = "login" | "register" | "forgot" | "verify" | "reset";
 export default function LoginPage() {
   const nav = useNavigate();
   const qc = useQueryClient();
-  const [mode, setMode] = useState<Mode>("login");
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -25,6 +27,13 @@ export default function LoginPage() {
   const [isUnregistered, setIsUnregistered] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+  useEffect(() => {
+    const qMode = searchParams.get("mode");
+    if (qMode === "register" || qMode === "login" || qMode === "forgot") {
+      setMode(qMode as Mode);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -141,7 +150,7 @@ export default function LoginPage() {
         resetSessionCaches();
         await login(cleanEmail, password);
         const afterReset = await me();
-        nav(afterReset.must_change_password ? "/change-password" : "/");
+        nav(afterReset.must_change_password ? "/change-password" : "/dashboard");
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to reset password. Please try again.");
       } finally {
@@ -166,11 +175,11 @@ export default function LoginPage() {
         resetSessionCaches();
         await login(cleanEmail, password);
         const u = await me();
-        nav(u.must_change_password ? "/change-password" : "/");
+        nav(u.must_change_password ? "/change-password" : "/dashboard");
       } else if (mode === "register") {
         resetSessionCaches();
         await register({ email: cleanEmail, password, name, timezone: tz });
-        nav("/");
+        nav("/dashboard");
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");

@@ -19,7 +19,7 @@ export default function ForceChangePasswordPage() {
   if (!getAccess()) return <Navigate to="/login" replace />;
   if (profile.isLoading) return <p>Loading…</p>;
   if (profile.isError) return <Navigate to="/login" replace />;
-  if (profile.data && !profile.data.must_change_password) return <Navigate to="/" replace />;
+  if (profile.data && !profile.data.must_change_password) return <Navigate to="/dashboard" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,7 +37,7 @@ export default function ForceChangePasswordPage() {
     try {
       await changeOwnPassword(password);
       await qc.invalidateQueries({ queryKey: ["me"] });
-      nav("/", { replace: true });
+      nav("/dashboard", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not update password.");
     } finally {

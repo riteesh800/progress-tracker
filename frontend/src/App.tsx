@@ -6,6 +6,7 @@ import { getAccess } from "./api/client";
 import { onWaking } from "./api/client";
 import { clearAdminToken } from "./api/admin.api";
 
+const HomePage = lazy(() => import("./pages/HomePage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForceChangePasswordPage = lazy(() => import("./pages/ForceChangePasswordPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
@@ -31,7 +32,7 @@ function Icon({ d }: { d: string }) {
 }
 
 const links = [
-  { to: "/", label: "Dashboard", end: true, d: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" },
+  { to: "/dashboard", label: "Dashboard", end: true, d: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" },
   { to: "/skills", label: "Skills", end: false, d: "M4 6h16M4 12h16M4 18h10" },
   { to: "/generate", label: "Generate using AI", end: false, d: "M12 2c0 5 4 9 9 9-5 0-9 4-9 9 0-5-4-9-9-9 5 0 9-4 9-9ZM19 2c0 2 1.5 3.5 3.5 3.5-2 0-3.5 1.5-3.5 3.5 0-2-1.5-3.5-3.5-3.5 2 0 3.5-1.5 3.5-3.5Z" },
   { to: "/import", label: "Import PDF", end: false, d: "M12 4v10m0 0 4-4m-4 4-4-4M5 18h14" },
@@ -65,7 +66,7 @@ function Shell({ children }: { children: ReactNode }) {
       </button>
       {open && <button type="button" className="nav-backdrop" aria-label="Close menu" onClick={() => setOpen(false)} />}
       <aside className="sidebar">
-        <NavLink className="brand" to="/" onClick={() => setOpen(false)}>
+        <NavLink className="brand" to="/dashboard" onClick={() => setOpen(false)}>
           Progress Tracker
         </NavLink>
         <nav className="nav">
@@ -111,9 +112,12 @@ export default function App() {
   return (
     <Suspense fallback={<p>Loading…</p>}>
       <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/dashboard" element={<Shell><DashboardPage /></Shell>} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<Navigate to="/login?mode=register" replace />} />
         <Route path="/change-password" element={<ForceChangePasswordPage />} />
-        <Route path="/" element={<Shell><DashboardPage /></Shell>} />
         <Route path="/skills" element={<Shell><SkillsPage /></Shell>} />
         <Route path="/skills/:id" element={<Shell><SkillDetailPage /></Shell>} />
         <Route path="/generate" element={<Shell><GenerateAIPage /></Shell>} />
