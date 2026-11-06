@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr, parseaddr
 
 from app.core.config import settings
 from app.core.exceptions import AppError
@@ -13,9 +14,14 @@ logger = get_logger(__name__)
 
 def _send_smtp(to_email: str, code: str) -> None:
     """Synchronous SMTP work — meant to run in a thread pool."""
+    sender_raw = settings.smtp_from or settings.smtp_user
+    name, addr = parseaddr(sender_raw)
+    display_name = name or "Skill Progress Tracker"
+    clean_addr = addr or sender_raw
+
     message = EmailMessage()
     message["Subject"] = f"{code} is your Skill Progress Tracker verification code"
-    message["From"] = settings.smtp_from or settings.smtp_user
+    message["From"] = formataddr((display_name, clean_addr))
     message["To"] = to_email
 
     plain_content = (
