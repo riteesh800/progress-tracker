@@ -5,10 +5,11 @@ import { getStreakCalendar } from "../api/streak.api";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatFriendlyDate(iso: string): string {
-  if (!iso) return "";
+  if (!iso || typeof iso !== "string") return "";
   const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
+  if (!y || !m || !d || isNaN(y) || isNaN(m) || isNaN(d)) return iso;
   const date = new Date(y, m - 1, d);
+  if (isNaN(date.getTime())) return iso;
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
@@ -66,9 +67,9 @@ export function ConsistencyGraph() {
     const rawPoints: RawDayPoint[] = [];
 
     // Anchor point at start: baseline 0 before first submission
-    const firstDate = relevantDays[0].date;
+    const firstDate = relevantDays[0].date || "";
     const [fy, fm, fd] = firstDate.split("-").map(Number);
-    const prevDateObj = new Date(fy, fm - 1, fd - 1);
+    const prevDateObj = (!isNaN(fy) && !isNaN(fm) && !isNaN(fd)) ? new Date(fy, fm - 1, fd - 1) : new Date();
     const prevDateStr = `${prevDateObj.getFullYear()}-${String(prevDateObj.getMonth() + 1).padStart(2, "0")}-${String(prevDateObj.getDate()).padStart(2, "0")}`;
 
     rawPoints.push({
@@ -281,7 +282,9 @@ export function ConsistencyGraph() {
           className="dash-graph-svg"
           preserveAspectRatio="none"
           onPointerMove={handlePointerMove}
+          onPointerDown={handlePointerMove}
           onPointerLeave={handlePointerLeave}
+          onPointerCancel={handlePointerLeave}
           aria-hidden="true"
         >
           <defs>
@@ -404,7 +407,7 @@ export function ConsistencyGraph() {
             <g transform={`translate(${latestPoint.x}, ${latestPoint.y})`}>
               <circle
                 r="7"
-                fill={latestPoint.type === "up" ? "#22c55e" : "#ef4444"}
+                fill={latestPoint.type === "up" ? "#22c55e" : latestPoint.type === "down" ? "#ef4444" : "#94a3b8"}
                 filter={`url(#glow-halo-${uid})`}
                 opacity="0.8"
               />
@@ -438,37 +441,44 @@ export function ConsistencyGraph() {
         </svg>
 
         {/* Interactive Floating Tooltip (strictly bounded inside card) */}
-        {activeHover && (
-          <div
-            className="dash-graph-tooltip"
-            style={{
-              left: `${Math.max(14, Math.min(86, (activeHover.x / SVG_WIDTH) * 100))}%`,
-            }}
-          >
-            <div className="dash-graph-tip-date">{formatFriendlyDate(activeHover.date)}</div>
-            <div className="dash-graph-tip-row">
-              {activeHover.type === "up" && (
-                <span className="dash-graph-tip-badge up">
-                  ▲ +1.0 Daily push • {activeHover.count} {activeHover.count === 1 ? "submission" : "submissions"}
-                </span>
-              )}
-              {activeHover.type === "down" && (
-                <span className="dash-graph-tip-badge down">
-                  ▼ -0.5 Missed day • No submissions
-                </span>
-              )}
-              {activeHover.type === "start" && (
-                <span className="dash-graph-tip-badge start">🌱 Journey baseline (0.0)</span>
-              )}
-              {activeHover.type === "flat" && (
-                <span className="dash-graph-tip-badge flat">— Floor at 0.0</span>
-              )}
+        {activeHover && (() => {
+          const tipPct = (activeHover.x / SVG_WIDTH) * 100;
+          let tipPositionStyle: React.CSSProperties;
+          if (tipPct < 25) {
+            tipPositionStyle = { left: "14px", transform: "none" };
+          } else if (tipPct > 75) {
+            tipPositionStyle = { right: "14px", left: "auto", transform: "none" };
+          } else {
+            tipPositionStyle = { left: `${tipPct}%`, transform: "translateX(-50%)" };
+          }
+
+          return (
+            <div className="dash-graph-tooltip" style={tipPositionStyle}>
+              <div className="dash-graph-tip-date">{formatFriendlyDate(activeHover.date)}</div>
+              <div className="dash-graph-tip-row">
+                {activeHover.type === "up" && (
+                  <span className="dash-graph-tip-badge up">
+                    ▲ +1.0 Daily push • {activeHover.count} {activeHover.count === 1 ? "submission" : "submissions"}
+                  </span>
+                )}
+                {activeHover.type === "down" && (
+                  <span className="dash-graph-tip-badge down">
+                    ▼ -0.5 Missed day • No submissions
+                  </span>
+                )}
+                {activeHover.type === "start" && (
+                  <span className="dash-graph-tip-badge start">🌱 Journey baseline (0.0)</span>
+                )}
+                {activeHover.type === "flat" && (
+                  <span className="dash-graph-tip-badge flat">— Floor at 0.0</span>
+                )}
+              </div>
+              <div className="dash-graph-tip-score">
+                Score: <strong>{activeHover.score.toFixed(1)}</strong>
+              </div>
             </div>
-            <div className="dash-graph-tip-score">
-              Score: <strong>{activeHover.score.toFixed(1)}</strong>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Legend & Timeline metadata */}

@@ -1105,6 +1105,7 @@ button:disabled {
   height: 100%;
   overflow: hidden;
   cursor: crosshair;
+  touch-action: pan-y;
 }
 
 .dash-graph-empty-wrap {
