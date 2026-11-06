@@ -2,15 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getDashboard } from "../api/progress.api";
 import { OverallProgressRing } from "../components/ProgressVisuals";
-
-const steps = [
-  { emoji: "📄", title: "Upload PDF", text: "Import a syllabus and review the generated topic tree." },
-  { emoji: "🌿", title: "Study leaves", text: "Work leaf topics only — those drive real completion." },
-  { emoji: "✅", title: "Mark complete", text: "Check a leaf when you finish it. Parents update automatically." },
-  { emoji: "📝", title: "Add notes", text: "Keep topic notes beside the tree, or personal tasks in Make Note." },
-  { emoji: "🔥", title: "Keep a streak", text: "Any leaf completion on a day earns that learning day." },
-  { emoji: "🔎", title: "Search & organize", text: "Find topics fast and keep each skill in its own tree." },
-];
+import { ConsistencyGraph } from "../components/ConsistencyGraph";
 
 export default function DashboardPage() {
   const dash = useQuery({ queryKey: ["dashboard"], queryFn: getDashboard });
@@ -98,32 +90,7 @@ export default function DashboardPage() {
         </section>
       )}
 
-      <section className="card dash-intro">
-        <h2>What is <span className="accent-text">Skill Progress Tracker</span>?</h2>
-        <p>
-          This app turns a messy syllabus into a <span className="accent-text">topic tree</span>.
-          You study <span className="warn-text">leaf topics</span>, mark them complete, add notes,
-          and watch progress and streaks grow — without losing credit if you later uncheck a leaf.
-        </p>
-        <div className="dash-flow">
-          <span>Upload PDF</span><em>→</em>
-          <span>Review tree</span><em>→</em>
-          <span>Study leaves</span><em>→</em>
-          <span>Mark complete</span><em>→</em>
-          <span>Track progress</span><em>→</em>
-          <span>Add notes</span><em>→</em>
-          <span>Keep streak</span>
-        </div>
-        <div className="dash-step-grid">
-          {steps.map((s) => (
-            <article className="dash-step" key={s.title}>
-              <div className="dash-emoji" aria-hidden>{s.emoji}</div>
-              <h3>{s.title}</h3>
-              <p className="muted">{s.text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ConsistencyGraph />
     </div>
   );
 }
