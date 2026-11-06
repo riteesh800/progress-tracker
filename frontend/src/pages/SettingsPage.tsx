@@ -107,7 +107,12 @@ export default function SettingsPage() {
   const saveTz = useMutation({
     mutationFn: (timezone: string) => updateMe({ timezone }),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["me"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        qc.invalidateQueries({ queryKey: ["streak"] }),
+        qc.invalidateQueries({ queryKey: ["streak-calendar"] }),
+      ]);
       setTzDirty(false);
       setTzMsg({ type: "ok", text: "Timezone saved." });
     },

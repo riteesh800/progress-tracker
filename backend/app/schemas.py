@@ -17,7 +17,7 @@ class TokenPair(BaseModel):
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    name: str = ""
+    name: str = Field(default="", max_length=200)
     timezone: str = "UTC"
 
     @field_validator("timezone")
@@ -107,8 +107,15 @@ class AdminPasswordIn(BaseModel):
 
 
 class UserUpdateIn(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, max_length=200)
     timezone: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return v.strip()
 
     @field_validator("timezone")
     @classmethod

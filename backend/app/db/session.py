@@ -31,7 +31,7 @@ else:
         "prepared_statement_cache_size": 0,
         "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
     }
-    # Tune pool for Render free-tier + Supabase (max ~20 connections).
+    # Tune pool for local/persistent server + Supabase connection pooler.
     engine_kwargs.update(
         pool_size=5,
         max_overflow=5,

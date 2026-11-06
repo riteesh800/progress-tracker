@@ -59,12 +59,14 @@ async def unlock_admin(
     request: Request,
     body: AdminUnlockIn,
     user: User = Depends(require_admin_account),
+    session: AsyncSession = Depends(get_db),
 ):
     enforce_limit(request, f"admin_unlock:{user.id}", 5, 15 * 60)
     if not admin_access_configured():
         raise AppError(503, "admin_unconfigured", "Admin access is not configured on the server.")
     if not verify_admin_access_code(body.access_code):
         raise AppError(403, "invalid_access_code", "Invalid Database Access Code.")
+    await session.commit()
     token = create_access_token(
         str(user.id),
         extra={"type": "admin"},
@@ -115,6 +117,7 @@ async def cleanup_expired_accounts(
     Also called automatically by the background task.
     """
     count = await _run_cleanup(session)
+    await session.commit()
     return {"ok": True, "deleted_count": count}
 
 
@@ -184,10 +187,10 @@ async def cron_cleanup(
     authorization: str | None = Header(default=None),
     session: AsyncSession = Depends(get_db),
 ):
-    """Endpoint for Vercel Cron or Render Cron to trigger periodic cleanup tasks.
+    """Endpoint for Vercel Cron to trigger periodic cleanup tasks.
 
     Secured by CLEANUP_SECRET or CRON_SECRET Bearer token (not admin JWT).
-    Supports GET (for Vercel Cron) and POST (for Render / external webhooks).
+    Supports GET (for Vercel Cron) and POST (for external webhooks).
     Idempotent: safe to call multiple times or concurrently.
     """
     _verify_cleanup_secret(authorization)

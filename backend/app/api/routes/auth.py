@@ -96,8 +96,13 @@ async def _issue_tokens(session: AsyncSession, user: User) -> TokenPair:
 async def register(request: Request, body: RegisterIn, session: AsyncSession = Depends(get_db)):
     enforce_limit(request, "register", 8, 15 * 60)
     existing = await session.execute(select(User).where(User.email == body.email.lower()))
-    if existing.scalar_one_or_none():
-        raise AppError(409, "email_taken", "An account with this email already exists.")
+    existing_user = existing.scalar_one_or_none()
+    if existing_user is not None:
+        if existing_user.deletion_requested_at is not None and _is_deletion_expired(existing_user):
+            await _permanently_delete_user(existing_user.id, session)
+            await session.commit()
+        else:
+            raise AppError(409, "email_taken", "An account with this email already exists.")
     user = User(
         email=body.email.lower(),
         password_hash=hash_password(body.password),
@@ -356,6 +361,12 @@ async def verify_reset_code(request: Request, body: VerifyResetIn, session: Asyn
 @router.post("/reset-password")
 async def reset_password(request: Request, body: ResetPasswordIn, session: AsyncSession = Depends(get_db)):
     enforce_limit(request, "reset", 8, 15 * 60)
+    enforce_limit_key(
+        f"reset-email:{body.email.lower()}",
+        max_hits=6,
+        window_seconds=15 * 60,
+        error_message="Too many password reset attempts for this account. Please wait and try again.",
+    )
     result = await session.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if user is not None and user.deletion_requested_at is not None and _is_deletion_expired(user):

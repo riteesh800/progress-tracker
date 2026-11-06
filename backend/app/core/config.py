@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # Server-only secret. Never expose to the frontend.
     admin_access_code: str = ""
     admin_session_expire_minutes: int = 30
-    # Shared secret for cron-triggered cleanup endpoint (Render Cron Job or Vercel Cron).
+    # Shared secret for cron-triggered cleanup endpoint (Vercel Cron).
     # Must be at least 32 characters in production. Accepts CLEANUP_SECRET or CRON_SECRET.
     cleanup_secret: str = ""
     cron_secret: str = ""

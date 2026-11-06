@@ -11,8 +11,18 @@ export type User = {
   must_change_password?: boolean;
 };
 
+function clearSessionArtifacts() {
+  try {
+    sessionStorage.removeItem("pt_admin_session");
+    sessionStorage.removeItem("pt_ai_draft");
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export async function register(body: { email: string; password: string; name: string; timezone: string }) {
   const tokens = await api<TokenPair>("/auth/register", { method: "POST", body: JSON.stringify(body), auth: false });
+  clearSessionArtifacts();
   setTokens(tokens.access_token, tokens.refresh_token);
   return tokens;
 }
@@ -22,6 +32,7 @@ export async function login(email: string, password: string) {
     body: JSON.stringify({ email, password }),
     auth: false,
   });
+  clearSessionArtifacts();
   setTokens(tokens.access_token, tokens.refresh_token);
   return tokens;
 }
@@ -31,6 +42,7 @@ export async function googleLogin(id_token: string, timezone: string) {
     body: JSON.stringify({ id_token, timezone }),
     auth: false,
   });
+  clearSessionArtifacts();
   setTokens(tokens.access_token, tokens.refresh_token);
   return tokens;
 }

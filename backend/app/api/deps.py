@@ -93,6 +93,9 @@ async def get_current_user(
             await session.commit()
             raise AppError(401, "unauthenticated", "User not found or inactive.")
 
+    if user.must_change_password and not _password_change_allowed(request):
+        raise AppError(403, "password_change_required", "You must set a new password before continuing.")
+
     # Track meaningful user activity and cancel pending deletion if applicable
     if _is_meaningful_activity(request):
         was_pending_deletion = user.deletion_requested_at is not None
@@ -105,8 +108,6 @@ async def get_current_user(
             await session.commit()
             await session.refresh(user)
 
-    if user.must_change_password and not _password_change_allowed(request):
-        raise AppError(403, "password_change_required", "You must set a new password before continuing.")
     return user
 
 

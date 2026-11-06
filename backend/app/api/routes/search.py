@@ -13,9 +13,14 @@ from app.schemas import SearchHit
 router = APIRouter(tags=["search"])
 
 
+def _escape_like(q: str) -> str:
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 @router.get("/search", response_model=list[SearchHit])
 async def search(
-    q: str = Query(min_length=1),
+    q: str = Query(min_length=1, max_length=200),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
@@ -31,7 +36,7 @@ async def search(
 
 async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list[SearchHit]:
     hits: list[SearchHit] = []
-    like = f"%{q}%"
+    like = _escape_like(q)
     params = {"uid": str(user_id), "q": q, "like": like}
     skill_rows = await session.execute(
         text(
@@ -43,9 +48,10 @@ async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list
               AND (
                 to_tsvector('english', coalesce(s.name, '') || ' ' || coalesce(s.description, ''))
                   @@ plainto_tsquery('english', :q)
-                OR s.name ILIKE :like
-                OR coalesce(s.description, '') ILIKE :like
+                OR s.name ILIKE :like ESCAPE '\\'
+                OR coalesce(s.description, '') ILIKE :like ESCAPE '\\'
               )
+            LIMIT 50
             """
         ),
         params,
@@ -71,9 +77,10 @@ async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list
               AND (
                 to_tsvector('english', coalesce(t.name, '') || ' ' || coalesce(t.description, ''))
                   @@ plainto_tsquery('english', :q)
-                OR t.name ILIKE :like
-                OR coalesce(t.description, '') ILIKE :like
+                OR t.name ILIKE :like ESCAPE '\\'
+                OR coalesce(t.description, '') ILIKE :like ESCAPE '\\'
               )
+            LIMIT 50
             """
         ),
         params,
@@ -101,8 +108,9 @@ async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list
               AND (
                 to_tsvector('english', coalesce(n.content, ''))
                   @@ plainto_tsquery('english', :q)
-                OR n.content ILIKE :like
+                OR n.content ILIKE :like ESCAPE '\\'
               )
+            LIMIT 50
             """
         ),
         params,
@@ -122,14 +130,16 @@ async def _postgres_search(session: AsyncSession, user_id: UUID, q: str) -> list
 
 
 async def _sqlite_search(session: AsyncSession, user_id: UUID, q: str) -> list[SearchHit]:
-    like = f"%{q}%"
+    like = _escape_like(q)
     hits: list[SearchHit] = []
     skills = await session.execute(
-        select(Skill).where(
+        select(Skill)
+        .where(
             Skill.user_id == user_id,
             Skill.deleted_at.is_(None),
-            or_(Skill.name.ilike(like), Skill.description.ilike(like)),
+            or_(Skill.name.ilike(like, escape="\\"), Skill.description.ilike(like, escape="\\")),
         )
+        .limit(50)
     )
     for s in skills.scalars():
         hits.append(
@@ -147,8 +157,9 @@ async def _sqlite_search(session: AsyncSession, user_id: UUID, q: str) -> list[S
         .where(
             Skill.user_id == user_id,
             Skill.deleted_at.is_(None),
-            or_(Topic.name.ilike(like), Topic.description.ilike(like)),
+            or_(Topic.name.ilike(like, escape="\\"), Topic.description.ilike(like, escape="\\")),
         )
+        .limit(50)
     )
     for t in topics.scalars():
         hits.append(
@@ -168,8 +179,9 @@ async def _sqlite_search(session: AsyncSession, user_id: UUID, q: str) -> list[S
         .where(
             Note.user_id == user_id,
             Skill.deleted_at.is_(None),
-            Note.content.ilike(like),
+            Note.content.ilike(like, escape="\\"),
         )
+        .limit(50)
     )
     for note, topic in notes.all():
         hits.append(

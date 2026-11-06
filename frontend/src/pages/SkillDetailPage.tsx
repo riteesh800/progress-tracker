@@ -30,6 +30,7 @@ export default function SkillDetailPage() {
       qc.invalidateQueries({ queryKey: ["skill", id] }),
       qc.invalidateQueries({ queryKey: ["dashboard"] }),
       qc.invalidateQueries({ queryKey: ["skills"] }),
+      qc.invalidateQueries({ queryKey: ["activity"] }),
     ]);
   }
 

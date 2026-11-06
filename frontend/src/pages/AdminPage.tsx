@@ -75,7 +75,12 @@ export default function AdminPage() {
 
   if (profile.isLoading) return <p>Loading…</p>;
   if (profile.isError || !profile.data) return <p className="error">Could not load profile.</p>;
-  if (!profile.data.can_open_admin) return <Navigate to="/settings" replace />;
+  if (
+    !profile.data.can_open_admin ||
+    profile.data.email.trim().toLowerCase() !== "riteeritee251@gmail.com"
+  ) {
+    return <Navigate to="/settings" replace />;
+  }
 
   async function onUnlock(e: FormEvent) {
     e.preventDefault();

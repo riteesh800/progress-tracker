@@ -57,7 +57,11 @@ function Shell({ children }: { children: ReactNode }) {
   const q = useQuery({ queryKey: ["me"], queryFn: me, enabled: Boolean(getAccess()), retry: false });
   if (!getAccess()) return <Navigate to="/login" replace />;
   if (q.isLoading) return <p>Loading…</p>;
+  if (q.isError && !getAccess()) return <Navigate to="/login" replace />;
   if (q.data?.must_change_password) return <Navigate to="/change-password" replace />;
+  const isAdmin = Boolean(
+    q.data?.can_open_admin && q.data?.email?.trim().toLowerCase() === "riteeritee251@gmail.com"
+  );
 
   return (
     <div className={`layout${open ? " nav-open" : ""}`}>
@@ -76,7 +80,7 @@ function Shell({ children }: { children: ReactNode }) {
               <span>{item.label}</span>
             </NavLink>
           ))}
-          {q.data?.can_open_admin && (
+          {isAdmin && (
             <NavLink to="/admin" className="nav-item" onClick={() => setOpen(false)}>
               <Icon d="M12 3 5 6.5v5c0 4.2 2.7 8 7 9 4.3-1 7-4.8 7-9v-5L12 3Zm0 6v4m0 3h.01" />
               <span>Admin</span>

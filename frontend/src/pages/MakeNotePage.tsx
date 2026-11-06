@@ -31,6 +31,7 @@ export default function MakeNotePage() {
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const debounceRef = useRef<number | null>(null);
+  const pendingSaveRef = useRef<{ id: string; title: string; tasks: DraftTask[] } | null>(null);
   const selectedIdRef = useRef<string | null>(null);
   const titleRef = useRef(title);
   const tasksRef = useRef(tasks);
@@ -61,9 +62,12 @@ export default function MakeNotePage() {
     setMsg(null);
   }, [selected?.id]);
 
-  async function persist(nextTitle: string, nextTasks: DraftTask[]) {
-    const id = selectedIdRef.current;
+  async function persist(nextTitle: string, nextTasks: DraftTask[], targetId?: string | null) {
+    const id = targetId ?? selectedIdRef.current;
     if (!id) return;
+    if (pendingSaveRef.current?.id === id) {
+      pendingSaveRef.current = null;
+    }
     setSaving(true);
     setMsg(null);
     try {
@@ -75,28 +79,58 @@ export default function MakeNotePage() {
         if (!prev) return [updated];
         return prev.map((n) => (n.id === updated.id ? updated : n));
       });
-      setMsg({ type: "ok", text: "Saved." });
+      if (selectedIdRef.current === id) {
+        setMsg({ type: "ok", text: "Saved." });
+      }
     } catch (e) {
-      setMsg({ type: "err", text: e instanceof ApiError ? e.message : "Could not save note." });
+      if (selectedIdRef.current === id) {
+        setMsg({ type: "err", text: e instanceof ApiError ? e.message : "Could not save note." });
+      }
     } finally {
       setSaving(false);
     }
   }
 
+  function flushPendingSave() {
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      pendingSaveRef.current = null;
+      void persist(pending.title, pending.tasks, pending.id);
+    }
+  }
+
   function persistNow(nextTitle: string, nextTasks: DraftTask[]) {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    void persist(nextTitle, nextTasks);
+    const id = selectedIdRef.current;
+    if (!id) return;
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    pendingSaveRef.current = null;
+    void persist(nextTitle, nextTasks, id);
   }
 
   function persistSoon(nextTitle: string, nextTasks: DraftTask[]) {
+    const id = selectedIdRef.current;
+    if (!id) return;
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    pendingSaveRef.current = { id, title: nextTitle, tasks: nextTasks };
     debounceRef.current = window.setTimeout(() => {
-      void persist(nextTitle, nextTasks);
+      debounceRef.current = null;
+      const pending = pendingSaveRef.current;
+      if (pending && pending.id === id) {
+        pendingSaveRef.current = null;
+        void persist(pending.title, pending.tasks, pending.id);
+      }
     }, 450);
   }
 
   useEffect(() => () => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    flushPendingSave();
   }, []);
 
   const create = useMutation({
@@ -133,7 +167,10 @@ export default function MakeNotePage() {
               <button
                 type="button"
                 className={note.id === selected?.id ? "makenote-item active" : "makenote-item"}
-                onClick={() => setSelectedId(note.id)}
+                onClick={() => {
+                  flushPendingSave();
+                  setSelectedId(note.id);
+                }}
               >
                 {note.title || "Untitled note"}
               </button>
@@ -144,7 +181,15 @@ export default function MakeNotePage() {
       <section className="makenote-editor card">
         <div className="makenote-editor-head">
           <div className="muted">Personal tasks — not part of skill progress or streak</div>
-          <button className="primary" type="button" onClick={() => create.mutate()} disabled={create.isPending}>
+          <button
+            className="primary"
+            type="button"
+            onClick={() => {
+              flushPendingSave();
+              create.mutate();
+            }}
+            disabled={create.isPending}
+          >
             + Create new note
           </button>
         </div>
@@ -224,7 +269,21 @@ export default function MakeNotePage() {
               >
                 {saving ? "Saving…" : "Save"}
               </button>
-              <button type="button" className="danger" disabled={remove.isPending} onClick={() => remove.mutate(selected.id)}>
+              <button
+                type="button"
+                className="danger"
+                disabled={remove.isPending}
+                onClick={() => {
+                  if (pendingSaveRef.current?.id === selected.id) {
+                    if (debounceRef.current) {
+                      window.clearTimeout(debounceRef.current);
+                      debounceRef.current = null;
+                    }
+                    pendingSaveRef.current = null;
+                  }
+                  remove.mutate(selected.id);
+                }}
+              >
                 Delete note
               </button>
             </div>

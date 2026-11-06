@@ -13,6 +13,7 @@ export function getRefresh() {
 export function setTokens(access: string, refresh: string) {
   localStorage.setItem(ACCESS, access);
   localStorage.setItem(REFRESH, refresh);
+  redirectingToLogin = false;
 }
 export function clearTokens() {
   localStorage.removeItem(ACCESS);

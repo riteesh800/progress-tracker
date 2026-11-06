@@ -168,8 +168,8 @@ export default function SkillTimerCard({ skillId }: { skillId: string }) {
   const handleSet = (e: React.FormEvent) => {
     e.preventDefault();
     if (!from || !to) return;
-    const fDate = new Date(from);
-    const tDate = new Date(to);
+    const fDate = new Date(from + "T00:00:00");
+    const tDate = new Date(to + "T00:00:00");
     
     if (isNaN(fDate.getTime()) || isNaN(tDate.getTime())) {
       setErrorMsg("invalid time");

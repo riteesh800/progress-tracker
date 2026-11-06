@@ -19,3 +19,10 @@ async def test_search_is_user_scoped(client):
     assert any(h["kind"] == "note" for h in notes)
     notes_b = (await client.get("/search", params={"q": "relaxation"}, headers=hb)).json()
     assert notes_b == []
+
+    # Wildcard characters % and _ must be escaped and not dump all records
+    wildcard_pct = (await client.get("/search", params={"q": "%"}, headers=ha)).json()
+    assert wildcard_pct == []
+    wildcard_under = (await client.get("/search", params={"q": "________"}, headers=ha)).json()
+    assert wildcard_under == []
+

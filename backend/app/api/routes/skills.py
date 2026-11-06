@@ -58,6 +58,24 @@ async def list_skills(
     return out
 
 
+async def _purge_skill_record(session: AsyncSession, skill: Skill) -> None:
+    topic_ids = (
+        await session.execute(select(Topic.id).where(Topic.skill_id == skill.id))
+    ).scalars().all()
+    if topic_ids:
+        await session.execute(
+            update(ActivityLog).where(ActivityLog.topic_id.in_(topic_ids)).values(topic_id=None)
+        )
+    await session.execute(
+        update(ActivityLog).where(ActivityLog.skill_id == skill.id).values(skill_id=None)
+    )
+    await session.execute(
+        update(ImportJob).where(ImportJob.skill_id == skill.id).values(skill_id=None)
+    )
+    await session.delete(skill)
+    await session.flush()
+
+
 @router.post("", response_model=SkillOut, status_code=201)
 async def create_skill(
     body: SkillIn,
@@ -65,10 +83,25 @@ async def create_skill(
     session: AsyncSession = Depends(get_db),
 ):
     existing = (
-        await session.execute(select(Skill.id).where(Skill.user_id == user.id, Skill.name == body.name))
+        await session.execute(select(Skill).where(Skill.user_id == user.id, Skill.name == body.name))
     ).scalars().first()
     if existing:
-        raise AppError(409, "skill_exists", "You already have a skill with this name.")
+        if existing.deleted_at is not None:
+            purge_at = (
+                existing.purge_at
+                if existing.purge_at is None or existing.purge_at.tzinfo
+                else existing.purge_at.replace(tzinfo=timezone.utc)
+            )
+            if purge_at is not None and datetime.now(timezone.utc) >= purge_at:
+                await _purge_skill_record(session, existing)
+            else:
+                raise AppError(
+                    409,
+                    "skill_exists",
+                    "You already have a skill with this name (check your Trash if you recently deleted it).",
+                )
+        else:
+            raise AppError(409, "skill_exists", "You already have a skill with this name.")
 
     skill = Skill(user_id=user.id, name=body.name, description=body.description)
     session.add(skill)
@@ -215,6 +248,10 @@ async def restore_skill(
     skill = await owned_skill(skill_id, user, session, allow_deleted=True)
     if skill.deleted_at is None:
         raise AppError(400, "not_in_trash", "Skill is not in trash.")
+    if skill.purge_at is not None:
+        purge_at = skill.purge_at if skill.purge_at.tzinfo else skill.purge_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) >= purge_at:
+            raise AppError(410, "trash_expired", "This skill's 3-day recovery window has expired.")
     skill.deleted_at = None
     skill.purge_at = None
     await session.commit()

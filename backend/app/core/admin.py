@@ -4,11 +4,13 @@ import hmac
 
 from app.core.config import settings
 
+ADMIN_EMAIL = "riteeritee251@gmail.com"
+
 
 def is_admin_email(email: str | None) -> bool:
     if not email:
         return False
-    return email.strip().lower() == settings.admin_email.strip().lower()
+    return email.strip().lower() == ADMIN_EMAIL
 
 
 def admin_access_configured() -> bool:

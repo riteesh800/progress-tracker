@@ -198,3 +198,18 @@ async def test_deleted_account_shows_deleted_status_in_admin_list(client):
     gone_user = next(u for u in after if u["email"] == "gone@example.com")
     assert gone_user["status"] == "Deleted"
 
+
+def test_admin_power_strictly_locked_to_designated_email():
+    from app.core.admin import is_admin_email
+    from app.core.config import settings
+
+    old = settings.admin_email
+    settings.admin_email = "imposter@gmail.com"
+    try:
+        assert is_admin_email("imposter@gmail.com") is False
+        assert is_admin_email("riteeritee251@gmail.com") is True
+        assert is_admin_email("  RITEERITEE251@GMAIL.COM ") is True
+    finally:
+        settings.admin_email = old
+
+

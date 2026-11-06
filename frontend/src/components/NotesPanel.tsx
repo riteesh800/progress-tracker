@@ -14,6 +14,7 @@ export default function NotesPanel({ topicId, topicName }: { topicId: string; to
       setContent("");
       setError("");
       qc.invalidateQueries({ queryKey: ["notes", topicId] });
+      qc.invalidateQueries({ queryKey: ["activity"] });
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : "Could not save note"),
   });
