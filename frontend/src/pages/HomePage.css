@@ -41,19 +41,19 @@
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #134e4a, #0f2937);
-  border: 1px solid rgba(94, 234, 212, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(94, 234, 212, 0.25);
   overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(94, 234, 212, 0.25);
 }
 
 .home-logo-img {
-  width: 26px;
-  height: 26px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  display: block;
 }
 
 .home-brand-text {
