@@ -231,15 +231,16 @@
 }
 
 /* Left & Right Red Arrows (matching user drawing) */
+button.home-nav-arrow,
 .home-nav-arrow {
   position: absolute;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) !important;
   background: rgba(18, 24, 32, 0.94);
   border: 2px solid #ef4444;
   color: #ef4444;
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -251,30 +252,34 @@
   user-select: none;
 }
 
+button.home-nav-arrow.prev,
 .home-nav-arrow.prev {
-  left: -25px;
+  left: -22px;
 }
 
+button.home-nav-arrow.next,
 .home-nav-arrow.next {
-  right: -25px;
+  right: -22px;
 }
 
+button.home-nav-arrow:hover,
 .home-nav-arrow:hover {
   background: #2d1317;
   border-color: #f87171;
   color: #ffffff;
-  transform: translateY(-50%) scale(1.14);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.85), 0 0 26px rgba(239, 68, 68, 0.8);
+  transform: translateY(-50%) scale(0.94) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), 0 0 18px rgba(239, 68, 68, 0.65);
 }
 
+button.home-nav-arrow:active,
 .home-nav-arrow:active {
-  transform: translateY(-50%) scale(0.96);
+  transform: translateY(-50%) scale(0.88) !important;
 }
 
 .home-nav-arrow svg {
-  width: 28px;
-  height: 28px;
-  stroke-width: 2.8;
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.6;
 }
 
 /* The Centered Feature Box (Exact Size and Placement as drawn) */
