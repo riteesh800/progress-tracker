@@ -580,43 +580,154 @@ export default function HomePage() {
       ),
     },
     {
-      id: "admin-console",
-      pill: "Admin Console",
-      category: "Administration",
-      title: "Administrative Command Center & Security Locks",
-      tagline: "Superuser directory inspection, password overrides, and auto-locking protection.",
+      id: "consistency-momentum",
+      pill: "Consistency & Momentum",
+      category: "Discipline & Momentum",
+      title: "Account Consistency & Momentum",
+      tagline: "Daily study consistency over the last year • Daily submissions push upward, missed days bring it down.",
       description:
-        "Protected admin tools for multi-user platforms. Administrators can audit registered users, inspect account states, unlock sessions with secret passkeys, and manage credentials safely.",
+        "Witness your daily learning discipline compound over time. The Consistency & Momentum engine models your study trajectory across a 365-day rolling timeline: daily study submissions boost your score by +1.0, while missed days bring it down by -0.5, holding you accountable to long-term mastery.",
       highlights: [
-        "Passkey-gated admin console with automatic session locking on tab switch or navigation",
-        "User directory inspection: view registered emails, activation dates, and pending deletions",
-        "Direct administrator password override triggering mandatory password change on next login",
-        "Automated background cron triggers for orphan data cleanup and expired trash purging",
+        "Mathematical momentum scoring: +1.0 gain on daily submissions and -0.5 penalty on missed study days",
+        "Asymmetric recovery formula: requires double the active days to rebuild momentum lost to skipped sessions",
+        "Live momentum analytics: real-time Momentum Score, Active Days ratio (e.g. 42 of 71), and all-time Peak records",
+        "Interactive SVG visualization: glowing green push lines, red missed-day drops, and rolling 1-year timeline",
       ],
-      ctaLabel: "Admin Access",
-      ctaLink: isAuthenticated ? "/admin" : "/login",
-      renderVisual: () => (
-        <div className="home-mockup-wrap">
-          <div style={{ background: "#131922", border: "1px solid #2a3b4e", borderRadius: "10px", padding: "0.85rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.6rem" }}>
-              <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "#ffffff" }}>Admin Control Shield</span>
-              <span style={{ background: "#134e4a", color: "#5eead4", fontSize: "0.7rem", padding: "0.15rem 0.4rem", borderRadius: "4px" }}>
-                🔒 Auto-Locks on Blur
-              </span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", fontSize: "0.74rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", background: "#192330", padding: "0.35rem 0.55rem", borderRadius: "4px" }}>
-                <span style={{ color: "#cbd5e1" }}>user@gmail.com</span>
-                <span style={{ color: "#5eead4" }}>Active</span>
+      ctaLabel: "Track Your Momentum",
+      ctaLink: isAuthenticated ? "/dashboard" : "/login?mode=register",
+      renderVisual: () => {
+        const pts = [
+          { x: 16, y: 124 },
+          { x: 26, y: 119 },
+          { x: 38, y: 122 },
+          { x: 50, y: 124 },
+          { x: 58, y: 119 },
+          { x: 74, y: 112 },
+          { x: 92, y: 104 },
+          { x: 106, y: 108 },
+          { x: 122, y: 100 },
+          { x: 138, y: 94 },
+          { x: 154, y: 88 },
+          { x: 162, y: 91 },
+          { x: 180, y: 82 },
+          { x: 202, y: 73 },
+          { x: 226, y: 64 },
+          { x: 248, y: 55 },
+          { x: 268, y: 62 },
+          { x: 284, y: 66 },
+          { x: 304, y: 56 },
+          { x: 322, y: 49 },
+          { x: 334, y: 52 },
+          { x: 350, y: 45 },
+          { x: 366, y: 42 },
+          { x: 380, y: 46 },
+          { x: 396, y: 38 },
+          { x: 416, y: 31 },
+          { x: 432, y: 35 },
+          { x: 448, y: 27 },
+          { x: 462, y: 31 },
+          { x: 486, y: 39 },
+          { x: 498, y: 43 },
+        ];
+        const areaD = `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ") + ` L ${pts[pts.length - 1].x} 124 L ${pts[0].x} 124 Z`;
+        const lastPt = pts[pts.length - 1];
+
+        return (
+          <div className="home-mockup-wrap">
+            <div style={{ background: "#10161f", border: "1px solid #223243", borderRadius: "10px", padding: "0.85rem", display: "flex", flexDirection: "column", gap: "0.6rem", width: "100%", boxSizing: "border-box" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.45rem" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.84rem", fontWeight: 600, color: "#ffffff" }}>
+                    <span>📈</span>
+                    <span>Account Consistency &amp; Momentum</span>
+                  </div>
+                  <div style={{ fontSize: "0.68rem", color: "#93a4b5", marginTop: "0.2rem" }}>
+                    Daily study consistency over the last year • Daily submissions push upward, missed days bring it down
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ background: "rgba(94, 234, 212, 0.08)", border: "1px solid rgba(94, 234, 212, 0.4)", borderRadius: "999px", padding: "0.18rem 0.5rem", fontSize: "0.72rem", color: "#e2e8f0", display: "inline-flex", gap: "0.3rem", alignItems: "center" }}>
+                    <span style={{ color: "#93a4b5" }}>Momentum Score</span>
+                    <strong style={{ color: "#5eead4", fontWeight: 700 }}>28.0</strong>
+                  </div>
+                  <div style={{ background: "#111720", border: "1px solid #283747", borderRadius: "999px", padding: "0.18rem 0.45rem", fontSize: "0.72rem", color: "#cbd5e1", display: "inline-flex", gap: "0.25rem", alignItems: "center" }}>
+                    <span style={{ color: "#93a4b5" }}>Active Days</span>
+                    <span>42 of 71</span>
+                  </div>
+                  <div style={{ background: "#111720", border: "1px solid #283747", borderRadius: "999px", padding: "0.18rem 0.45rem", fontSize: "0.72rem", color: "#cbd5e1", display: "inline-flex", gap: "0.25rem", alignItems: "center" }}>
+                    <span style={{ color: "#93a4b5" }}>Peak</span>
+                    <span>30.5</span>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", background: "#192330", padding: "0.35rem 0.55rem", borderRadius: "4px" }}>
-                <span style={{ color: "#cbd5e1" }}>dev@gmail.com</span>
-                <span style={{ color: "#fbbf24" }}>Reset Password</span>
+
+              <div style={{ position: "relative", width: "100%", height: "140px", borderRadius: "8px", background: "radial-gradient(ellipse 70% 50% at 50% 0%, rgba(34, 197, 94, 0.06), transparent 70%), #111720", border: "1px solid rgba(44, 56, 70, 0.6)", overflow: "hidden", boxSizing: "border-box" }}>
+                <svg viewBox="0 0 520 145" style={{ width: "100%", height: "100%", display: "block" }} preserveAspectRatio="none">
+                  <defs>
+                    <filter id="mock-glow-green" x="-30%" y="-30%" width="160%" height="160%">
+                      <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#22c55e" floodOpacity="0.85" />
+                    </filter>
+                    <filter id="mock-glow-red" x="-30%" y="-30%" width="160%" height="160%">
+                      <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#ef4444" floodOpacity="0.8" />
+                    </filter>
+                    <filter id="mock-glow-halo" x="-50%" y="-50%" width="200%" height="200%">
+                      <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#ef4444" floodOpacity="0.9" />
+                    </filter>
+                    <linearGradient id="mock-area-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#22c55e" stopOpacity="0.22" />
+                      <stop offset="60%" stopColor="#10b981" stopOpacity="0.08" />
+                      <stop offset="100%" stopColor="#0f172a" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+
+                  <line x1="16" y1="20" x2="504" y2="20" stroke="rgba(255,255,255,0.03)" strokeDasharray="4 6" />
+                  <line x1="16" y1="72" x2="504" y2="72" stroke="rgba(255,255,255,0.03)" strokeDasharray="4 6" />
+                  <line x1="16" y1="124" x2="504" y2="124" stroke="rgba(148, 163, 184, 0.22)" strokeWidth="1.2" strokeDasharray="3 3" />
+
+                  <path d={areaD} fill="url(#mock-area-grad)" />
+
+                  {pts.slice(1).map((pt, i) => {
+                    const prev = pts[i];
+                    const isUp = pt.y < prev.y;
+                    return (
+                      <line
+                        key={i}
+                        x1={prev.x}
+                        y1={prev.y}
+                        x2={pt.x}
+                        y2={pt.y}
+                        stroke={isUp ? "#22c55e" : "#ef4444"}
+                        strokeWidth={isUp ? 2.6 : 1.6}
+                        strokeLinecap="round"
+                        filter={isUp ? "url(#mock-glow-green)" : "url(#mock-glow-red)"}
+                      />
+                    );
+                  })}
+
+                  <g transform={`translate(${lastPt.x}, ${lastPt.y})`}>
+                    <circle r="6.5" fill="#ef4444" filter="url(#mock-glow-halo)" opacity="0.85" />
+                    <circle r="3" fill="#ffffff" />
+                  </g>
+                </svg>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.68rem", color: "#93a4b5", flexWrap: "wrap", gap: "0.3rem" }}>
+                <div style={{ display: "flex", gap: "0.8rem", alignItems: "center" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                    <span style={{ width: "6.5px", height: "6.5px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                    <span>Daily submission (+1.0 Up)</span>
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                    <span style={{ width: "6.5px", height: "6.5px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 5px #ef4444" }} />
+                    <span>Missed day (-0.5 Down)</span>
+                  </span>
+                </div>
+                <span style={{ color: "#64748b" }}>Showing last 1 year timeline (71 days tracked)</span>
               </div>
             </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       id: "fluid-ui",
