@@ -1,15 +1,26 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Query parameters added by Supabase / libpq that asyncpg.connect() does not accept as kwargs
 _UNSUPPORTED_ASYNCPG_PARAMS = {"pgbouncer", "supa", "options", "channel_binding"}
 
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+_ROOT_DIR = _BASE_DIR.parent
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(
+            str(_ROOT_DIR / ".env"),
+            str(_BASE_DIR / ".env"),
+            ".env",
+        ),
+        extra="ignore",
+    )
 
     database_url: str = "sqlite+aiosqlite:///./progress_tracker.db"
     jwt_secret: str = "dev-access-secret-change-me"

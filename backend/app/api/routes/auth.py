@@ -15,7 +15,7 @@ from app.api.deps import get_current_user, get_db, serialize_user
 from app.core.config import settings
 from app.core.exceptions import AppError
 from app.core.logging import get_logger
-from app.core.rate_limit import enforce_limit
+from app.core.rate_limit import enforce_limit, enforce_limit_key
 from app.core.security import (
     create_access_token,
     create_refresh_token_value,
@@ -287,6 +287,12 @@ async def _unused_reset_row(session: AsyncSession, user: User, code: str) -> Pas
 @router.post("/forgot-password")
 async def forgot_password(request: Request, body: ForgotPasswordIn, session: AsyncSession = Depends(get_db)):
     enforce_limit(request, "forgot", 5, 15 * 60)
+    enforce_limit_key(
+        f"forgot-email:{body.email.lower()}",
+        max_hits=5,
+        window_seconds=15 * 60,
+        error_message="Too many password reset requests for this email. Please try again later.",
+    )
     result = await session.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if user is not None and user.deletion_requested_at is not None and _is_deletion_expired(user):
@@ -297,17 +303,29 @@ async def forgot_password(request: Request, body: ForgotPasswordIn, session: Asy
         raise AppError(404, "email_not_registered", "This email is not registered. Please register an account first.")
     if not user.password_hash:
         raise AppError(400, "password_unavailable", "This account does not have a password. Sign in with Google instead.")
-    code = f"{secrets.randbelow(1000000):06d}"
-    session.add(
-        PasswordResetToken(
-            user_id=user.id,
-            code_hash=_hash_token(code),
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
-            used=False,
-        )
+
+    # Invalidate previous unused reset tokens for this user
+    await session.execute(
+        update(PasswordResetToken)
+        .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used.is_(False))
+        .values(used=True)
     )
+
+    code = f"{secrets.randbelow(1000000):06d}"
+    token_row = PasswordResetToken(
+        user_id=user.id,
+        code_hash=_hash_token(code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        used=False,
+    )
+    session.add(token_row)
+    await session.flush()
+    try:
+        await send_password_reset_email(user.email, code)
+    except Exception:
+        await session.rollback()
+        raise
     await session.commit()
-    await send_password_reset_email(user.email, code)
     payload: dict = {"ok": True, "message": "Reset code sent to your email."}
     if settings.environment == "test":
         payload["dev_code"] = code
@@ -317,6 +335,12 @@ async def forgot_password(request: Request, body: ForgotPasswordIn, session: Asy
 @router.post("/verify-reset-code")
 async def verify_reset_code(request: Request, body: VerifyResetIn, session: AsyncSession = Depends(get_db)):
     enforce_limit(request, "verify-reset", 8, 15 * 60)
+    enforce_limit_key(
+        f"verify-reset-email:{body.email.lower()}",
+        max_hits=6,
+        window_seconds=15 * 60,
+        error_message="Too many verification attempts for this account. Please wait and try again.",
+    )
     result = await session.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
     if user is not None and user.deletion_requested_at is not None and _is_deletion_expired(user):
@@ -325,7 +349,7 @@ async def verify_reset_code(request: Request, body: VerifyResetIn, session: Asyn
         user = None
     if user is None:
         raise AppError(400, "invalid_reset", "Invalid or expired reset code.")
-    await _unused_reset_row(session, user, body.code)
+    await _unused_reset_row(session, user, body.code.strip())
     return {"ok": True}
 
 
@@ -340,7 +364,7 @@ async def reset_password(request: Request, body: ResetPasswordIn, session: Async
         user = None
     if user is None:
         raise AppError(400, "invalid_reset", "Invalid or expired reset code.")
-    row = await _unused_reset_row(session, user, body.code)
+    row = await _unused_reset_row(session, user, body.code.strip())
     row.used = True
     await session.execute(
         update(PasswordResetToken)

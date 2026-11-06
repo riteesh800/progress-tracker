@@ -92,6 +92,46 @@ async def test_password_reset_revokes_refresh_tokens(client):
     assert reused.status_code == 401
 
 
+async def test_password_reset_validates_min_length_and_supersedes_prior_codes(client):
+    await register(client, "supersede@example.com")
+    # Request first code
+    req1 = await client.post("/auth/forgot-password", json={"email": "supersede@example.com"})
+    code1 = req1.json()["dev_code"]
+
+    # Request second code (superseding the first)
+    req2 = await client.post("/auth/forgot-password", json={"email": "supersede@example.com"})
+    code2 = req2.json()["dev_code"]
+    assert code1 != code2
+
+    # Old code must be rejected
+    v1 = await client.post("/auth/verify-reset-code", json={"email": "supersede@example.com", "code": code1})
+    assert v1.status_code == 400
+
+    # New code must be accepted
+    v2 = await client.post("/auth/verify-reset-code", json={"email": "supersede@example.com", "code": code2})
+    assert v2.status_code == 200
+
+    # Reject passwords under 8 characters
+    short_reset = await client.post(
+        "/auth/reset-password",
+        json={"email": "supersede@example.com", "code": code2, "new_password": "short"},
+    )
+    assert short_reset.status_code == 422
+
+    # Accept valid >= 8 character password
+    ok_reset = await client.post(
+        "/auth/reset-password",
+        json={"email": "supersede@example.com", "code": code2, "new_password": "validpassword123"},
+    )
+    assert ok_reset.status_code == 200
+
+    # Verify user can log in with new password
+    login_ok = await client.post(
+        "/auth/login", json={"email": "supersede@example.com", "password": "validpassword123"}
+    )
+    assert login_ok.status_code == 200
+
+
 def test_google_test_tokens_rejected_outside_test_env():
     from app.api.routes.auth import _verify_google
     from app.core.config import settings

@@ -49,3 +49,24 @@ def enforce_limit(request: Request, key: str, max_hits: int, window_seconds: int
     if len(q) >= max_hits:
         raise AppError(429, "rate_limited", "Too many requests. Please wait and try again.")
     q.append(now)
+
+
+def enforce_limit_key(
+    key: str,
+    max_hits: int,
+    window_seconds: int,
+    error_message: str = "Too many requests. Please wait and try again.",
+) -> None:
+    if settings.environment == "test" or not limiter.enabled:
+        return
+    now = time.time()
+    if len(_hits) > 5000:
+        stale_keys = [k for k, dq in _hits.items() if not dq or now - dq[-1] > window_seconds]
+        for k in stale_keys:
+            _hits.pop(k, None)
+    q = _hits[key]
+    while q and now - q[0] > window_seconds:
+        q.popleft()
+    if len(q) >= max_hits:
+        raise AppError(429, "rate_limited", error_message)
+    q.append(now)

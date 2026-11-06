@@ -811,6 +811,43 @@ button:disabled {
   50% { filter: brightness(1.25); }
 }
 .auth-switch { justify-content: center; }
+.auth-switch button.active {
+  border-color: var(--accent, #3d9b8f);
+  color: var(--accent, #3d9b8f);
+  font-weight: 600;
+}
+.auth-unregistered-box {
+  background: rgba(61, 155, 143, 0.08);
+  border: 1px solid var(--accent, #3d9b8f);
+  border-radius: 8px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  align-items: flex-start;
+}
+.auth-unregistered-box button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+.auth-text-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent, #3d9b8f);
+  padding: 0;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-text-btn:disabled {
+  color: var(--muted);
+  text-decoration: none;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .dash-page { gap: 1.15rem; }
 .dash-hero {
   display: flex;
