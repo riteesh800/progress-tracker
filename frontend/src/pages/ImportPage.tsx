@@ -29,6 +29,8 @@ function PdfUploadArt() {
   );
 }
 
+const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 function UploadCard({
   onFile,
   uploading,
@@ -48,7 +50,11 @@ function UploadCard({
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       return;
     }
-    setPickedName(file.name);
+    if (file.size <= MAX_PDF_SIZE_BYTES) {
+      setPickedName(file.name);
+    } else {
+      setPickedName("");
+    }
     onFile(file);
   }
 
@@ -238,6 +244,10 @@ export default function ImportPage() {
 
   async function onFile(file: File) {
     setError("");
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      setError("File size exceeds 10 MB. Please upload a PDF smaller than 10 MB.");
+      return;
+    }
     setUploading(true);
     try {
       const j = await uploadPdf(file);

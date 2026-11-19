@@ -6,8 +6,31 @@ on:
   pull_request:
 
 jobs:
-  backend:
+  backend-go:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: sqlite+aiosqlite:///./test_ci.db
+      JWT_SECRET: ci-access-secret-minimum-32-chars-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-minimum-32-chars-long
+      INTERNAL_PARSER_SECRET: ci-internal-parser-secret-32-chars!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: go test -v ./tests/...
+
+  backend-python:
+    runs-on: ubuntu-latest
+    if: hashFiles('backend/**') != ''
     defaults:
       run:
         working-directory: backend

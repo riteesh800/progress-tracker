@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.go": {
+      "maxDuration": 60,
+      "excludeFiles": "{tests/**,cmd/**,**/__pycache__/**,**/*.pyc}"
+    },
+    "api/internal_pdf_parser.py": {
+      "maxDuration": 30,
+      "includeFiles": "pybridge/**",
+      "excludeFiles": "{tests/**,internal/**,cmd/**,**/__pycache__/**,**/*.pyc}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/internal_pdf_parser",
+      "destination": "/api/internal_pdf_parser.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.go"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/admin/cron/cleanup",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

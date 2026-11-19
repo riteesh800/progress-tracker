@@ -3,15 +3,24 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/index.py": {
+    "api/index.go": {
       "maxDuration": 60,
-      "excludeFiles": "{backend/tests/**,**/__pycache__/**,**/*.pyc,.pytest_cache/**,.ruff_cache/**,frontend/**,node_modules/**}"
+      "excludeFiles": "{backend-go/tests/**,backend-go/cmd/**,**/__pycache__/**,**/*.pyc}"
+    },
+    "api/internal_pdf_parser.py": {
+      "maxDuration": 30,
+      "includeFiles": "pybridge/**",
+      "excludeFiles": "{backend-go/tests/**,backend-go/internal/**,backend-go/cmd/**,**/__pycache__/**,**/*.pyc}"
     }
   },
   "rewrites": [
     {
+      "source": "/api/internal_pdf_parser",
+      "destination": "/api/internal_pdf_parser.py"
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "destination": "/api/index.go"
     },
     {
       "source": "/(.*)",
@@ -39,4 +48,3 @@
     }
   ]
 }
-
