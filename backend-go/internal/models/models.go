@@ -155,3 +155,25 @@ type SkillTimer struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type Goal struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	GoalName       string
+	DeadlineAt     time.Time
+	Timezone       string
+	MotivationLine *string
+	DeletedAt      *time.Time
+	PurgeAt        *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type GoalActivity struct {
+	ID           uuid.UUID
+	GoalID       uuid.UUID
+	UserID       uuid.UUID
+	ActivityText string
+	ActivityDate string // YYYY-MM-DD
+	CreatedAt    time.Time
+}

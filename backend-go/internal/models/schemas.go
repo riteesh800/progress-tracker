@@ -746,6 +746,182 @@ func (c *ConfirmSyllabusIn) Validate() error {
 	return nil
 }
 
+type GoalIn struct {
+	GoalName       string  `json:"goal_name"`
+	DeadlineAt     string  `json:"deadline_at"`
+	Timezone       *string `json:"timezone"`
+	MotivationLine *string `json:"motivation_line"`
+}
+
+func (g *GoalIn) Validate() error {
+	g.GoalName = strings.TrimSpace(g.GoalName)
+	if g.GoalName == "" {
+		return errors.New("goal_name cannot be empty")
+	}
+	if utf8.RuneCountInString(g.GoalName) > 100 {
+		return errors.New("goal_name exceeds 100 characters")
+	}
+
+	tz := "UTC"
+	if g.Timezone != nil && strings.TrimSpace(*g.Timezone) != "" {
+		tz = strings.TrimSpace(*g.Timezone)
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return errors.New("invalid timezone")
+	}
+	g.Timezone = &tz
+
+	g.DeadlineAt = strings.TrimSpace(g.DeadlineAt)
+	if g.DeadlineAt == "" {
+		return errors.New("deadline_at is required")
+	}
+
+	// Try standard date-time formats
+	var parsedTime time.Time
+	formats := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+	}
+	parsed := false
+	for _, f := range formats {
+		if strings.Contains(f, "Z") || strings.Contains(f, "07:00") {
+			t, err := time.Parse(f, g.DeadlineAt)
+			if err == nil {
+				parsedTime = t
+				parsed = true
+				break
+			}
+		} else {
+			t, err := time.ParseInLocation(f, g.DeadlineAt, loc)
+			if err == nil {
+				parsedTime = t
+				parsed = true
+				break
+			}
+		}
+	}
+	if !parsed {
+		return errors.New("invalid deadline format, expected date and time")
+	}
+	g.DeadlineAt = parsedTime.UTC().Format(time.RFC3339)
+
+	if g.MotivationLine != nil {
+		trimmed := strings.TrimSpace(*g.MotivationLine)
+		if trimmed == "" {
+			g.MotivationLine = nil
+		} else {
+			if utf8.RuneCountInString(trimmed) > 200 {
+				return errors.New("motivation_line exceeds 200 characters")
+			}
+			g.MotivationLine = &trimmed
+		}
+	}
+	return nil
+}
+
+type GoalOut struct {
+	ID              uuid.UUID  `json:"id"`
+	GoalName        string     `json:"goal_name"`
+	DeadlineAt      time.Time  `json:"deadline_at"`
+	Timezone        string     `json:"timezone"`
+	MotivationLine  *string    `json:"motivation_line,omitempty"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	PurgeAt         *time.Time `json:"purge_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	IsExpired       bool       `json:"is_expired"`
+	TotalActivities int        `json:"total_activities"`
+}
+
+type GoalDailySummary struct {
+	WorkedDays        int     `json:"worked_days"`
+	MissedDays        int     `json:"missed_days"`
+	TotalDays         int     `json:"total_days"`
+	IsDeadlineReached bool    `json:"is_deadline_reached"`
+	InactivityWarning bool    `json:"inactivity_warning"`
+	CurrentScore      float64 `json:"current_score"`
+}
+
+type GoalDetailOut struct {
+	Goal              GoalOut          `json:"goal"`
+	Summary           GoalDailySummary `json:"summary"`
+	InactivityWarning bool             `json:"inactivity_warning"`
+	MissedDays        int              `json:"missed_days"`
+	WorkedDays        int              `json:"worked_days"`
+	TotalDays         int              `json:"total_days"`
+	CurrentScore      float64          `json:"current_score"`
+	IsDeadlineReached bool             `json:"is_deadline_reached"`
+}
+
+type GoalActivityIn struct {
+	ActivityText string  `json:"activity_text"`
+	ActivityDate *string `json:"activity_date"`
+}
+
+func (a *GoalActivityIn) Validate() error {
+	trimmed := strings.TrimSpace(a.ActivityText)
+	if trimmed == "" {
+		return errors.New("activity text cannot be empty or only spaces")
+	}
+	if utf8.RuneCountInString(trimmed) > 50 {
+		return errors.New("activity text exceeds 50 characters")
+	}
+	a.ActivityText = trimmed
+
+	if a.ActivityDate != nil {
+		trimmedDate := strings.TrimSpace(*a.ActivityDate)
+		if trimmedDate != "" {
+			_, err := time.Parse("2006-01-02", trimmedDate)
+			if err != nil {
+				return errors.New("invalid activity_date format, expected YYYY-MM-DD")
+			}
+			a.ActivityDate = &trimmedDate
+		} else {
+			a.ActivityDate = nil
+		}
+	}
+	return nil
+}
+
+type GoalActivityOut struct {
+	ID           uuid.UUID `json:"id"`
+	GoalID       uuid.UUID `json:"goal_id"`
+	ActivityText string    `json:"activity_text"`
+	ActivityDate string    `json:"activity_date"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type GoalActivitiesPageOut struct {
+	Activities []GoalActivityOut `json:"activities"`
+	Total      int               `json:"total"`
+	Page       int               `json:"page"`
+	PerPage    int               `json:"per_page"`
+}
+
+type GoalProgressPoint struct {
+	Date         string  `json:"date"`
+	HasActivity  bool    `json:"has_activity"`
+	DailyChange  float64 `json:"daily_change"`
+	Score        float64 `json:"score"`
+	IsCurrentDay bool    `json:"is_current_day"`
+}
+
+type GoalProgressOut struct {
+	GoalID            uuid.UUID           `json:"goal_id"`
+	Points            []GoalProgressPoint `json:"points"`
+	CurrentScore      float64             `json:"current_score"`
+	WorkedDays        int                 `json:"worked_days"`
+	MissedDays        int                 `json:"missed_days"`
+	TotalTrackedDays  int                 `json:"total_tracked_days"`
+	IsDeadlineReached bool                `json:"is_deadline_reached"`
+	InactivityWarning bool                `json:"inactivity_warning"`
+}
+
 func DecodeAndValidate[T any, PT interface {
 	*T
 	Validate() error

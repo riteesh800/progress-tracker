@@ -65,6 +65,19 @@ func NewRouter(cfg *config.Settings, db *database.DB, limiter *core.RateLimiter)
 	mux.HandleFunc("PUT /skills/{skill_id}/timer", middleware.RequireAuth(cfg, db, s.UpsertTimer))
 	mux.HandleFunc("DELETE /skills/{skill_id}/timer", middleware.RequireAuth(cfg, db, s.DeleteTimer))
 
+	// Goals routes
+	mux.HandleFunc("GET /goals", middleware.RequireAuth(cfg, db, s.ListGoals))
+	mux.HandleFunc("POST /goals", middleware.RequireAuth(cfg, db, s.CreateGoal))
+	mux.HandleFunc("GET /goals/trash", middleware.RequireAuth(cfg, db, s.ListDeletedGoals))
+	mux.HandleFunc("GET /goals/{goal_id}", middleware.RequireAuth(cfg, db, s.GetGoal))
+	mux.HandleFunc("DELETE /goals/{goal_id}", middleware.RequireAuth(cfg, db, s.DeleteGoal))
+	mux.HandleFunc("POST /goals/{goal_id}/restore", middleware.RequireAuth(cfg, db, s.RestoreGoal))
+	mux.HandleFunc("DELETE /goals/{goal_id}/permanent", middleware.RequireAuth(cfg, db, s.PurgeGoal))
+	mux.HandleFunc("DELETE /goals/{goal_id}/purge", middleware.RequireAuth(cfg, db, s.PurgeGoal))
+	mux.HandleFunc("GET /goals/{goal_id}/activities", middleware.RequireAuth(cfg, db, s.ListGoalActivities))
+	mux.HandleFunc("POST /goals/{goal_id}/activities", middleware.RequireAuth(cfg, db, s.AddGoalActivity))
+	mux.HandleFunc("GET /goals/{goal_id}/progress", middleware.RequireAuth(cfg, db, s.GetGoalProgress))
+
 	// Topics routes
 	mux.HandleFunc("POST /topics", middleware.RequireAuth(cfg, db, s.CreateTopic))
 	mux.HandleFunc("GET /topics/{topic_id}", middleware.RequireAuth(cfg, db, s.GetTopic))

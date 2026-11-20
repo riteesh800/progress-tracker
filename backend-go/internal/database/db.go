@@ -344,6 +344,33 @@ func (db *DB) InitSQLiteSchema(ctx context.Context) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS ix_skill_timers_user_id ON skill_timers(user_id)`,
 		`CREATE INDEX IF NOT EXISTS ix_skill_timers_skill_id ON skill_timers(skill_id)`,
+		`CREATE TABLE IF NOT EXISTS goals (
+			id CHAR(36) PRIMARY KEY,
+			user_id CHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			goal_name VARCHAR(100) NOT NULL,
+			deadline_at DATETIME NOT NULL,
+			timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+			motivation_line VARCHAR(200),
+			deleted_at DATETIME,
+			purge_at DATETIME,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_goals_user_id ON goals(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_goals_user_deleted ON goals(user_id, deleted_at)`,
+		`CREATE INDEX IF NOT EXISTS ix_goals_purge_at ON goals(purge_at)`,
+		`CREATE TABLE IF NOT EXISTS goal_activities (
+			id CHAR(36) PRIMARY KEY,
+			goal_id CHAR(36) NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+			user_id CHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			activity_text VARCHAR(50) NOT NULL,
+			activity_date DATE NOT NULL,
+			created_at DATETIME NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_goal_id ON goal_activities(goal_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_user_id ON goal_activities(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_goal_date ON goal_activities(goal_id, activity_date)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_user_date ON goal_activities(user_id, activity_date)`,
 	}
 	for _, stmt := range ddl {
 		if _, err := db.SQL.ExecContext(ctx, stmt); err != nil {
@@ -405,6 +432,8 @@ func (db *DB) ResetForTesting(ctx context.Context, cfg *config.Settings) error {
 	}
 	_, _ = db.SQL.ExecContext(ctx, "PRAGMA foreign_keys = OFF")
 	tables := []string{
+		"goal_activities",
+		"goals",
 		"skill_timers",
 		"password_reset_tokens",
 		"refresh_tokens",

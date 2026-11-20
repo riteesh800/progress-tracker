@@ -20,6 +20,7 @@ export default defineConfig({
       "/api": apiProxy(),
       "/auth": apiProxy(),
       "/skills": apiProxy(),
+      "/goals": apiProxy(),
       "/topics": apiProxy(),
       "/notes": apiProxy(),
       "/personal-notes": apiProxy(),

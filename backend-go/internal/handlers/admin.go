@@ -113,6 +113,48 @@ func (s *Server) runSkillCleanup(ctx context.Context) (int, error) {
 	return purgedCount, nil
 }
 
+func (s *Server) runGoalCleanup(ctx context.Context) (int, error) {
+	now := time.Now().UTC()
+	rows, err := s.DB.Query(
+		ctx, nil,
+		`SELECT id, purge_at FROM goals WHERE deleted_at IS NOT NULL AND purge_at IS NOT NULL`,
+	)
+	if err != nil {
+		return 0, err
+	}
+	var expiredIDs []uuid.UUID
+	for rows.Next() {
+		var rawID string
+		var rawPurge any
+		if err := rows.Scan(&rawID, &rawPurge); err != nil {
+			continue
+		}
+		id, err := database.ParseUUID(rawID)
+		if err != nil {
+			continue
+		}
+		pa, err := database.ParseNullTime(rawPurge)
+		if err != nil || pa == nil {
+			continue
+		}
+		if !now.Before(pa.UTC()) {
+			expiredIDs = append(expiredIDs, id)
+		}
+	}
+	rows.Close()
+
+	purgedCount := 0
+	for _, gid := range expiredIDs {
+		err := s.DB.WithTx(ctx, func(tx *sql.Tx) error {
+			return s.PurgeGoalRecord(ctx, tx, gid)
+		})
+		if err == nil {
+			purgedCount++
+		}
+	}
+	return purgedCount, nil
+}
+
 func (s *Server) UnlockAdmin(w http.ResponseWriter, r *http.Request, user *models.User) {
 	body, ok := DecodeBody[models.AdminUnlockIn](w, r)
 	if !ok {
@@ -266,9 +308,15 @@ func (s *Server) CronCleanupExpiredAccounts(w http.ResponseWriter, r *http.Reque
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
+	goalsPurged, err := s.runGoalCleanup(r.Context())
+	if err != nil {
+		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
+		return
+	}
 	core.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok":               true,
 		"accounts_deleted": accountsDeleted,
 		"skills_purged":    skillsPurged,
+		"goals_purged":     goalsPurged,
 	})
 }

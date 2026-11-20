@@ -12,6 +12,8 @@ const ForceChangePasswordPage = lazy(() => import("./pages/ForceChangePasswordPa
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const SkillsPage = lazy(() => import("./pages/SkillsPage"));
 const SkillDetailPage = lazy(() => import("./pages/SkillDetailPage"));
+const GoalsPage = lazy(() => import("./pages/GoalsPage"));
+const GoalDetailPage = lazy(() => import("./pages/GoalDetailPage"));
 const ImportPage = lazy(() => import("./pages/ImportPage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -34,6 +36,7 @@ function Icon({ d }: { d: string }) {
 const links = [
   { to: "/dashboard", label: "Dashboard", end: true, d: "M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" },
   { to: "/skills", label: "Skills", end: false, d: "M4 6h16M4 12h16M4 18h10" },
+  { to: "/goals", label: "Goals", end: false, d: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8Zm0-14a6 6 0 1 0 6 6 6 6 0 0 0-6-6Zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4Zm0-6a2 2 0 1 0 2 2 2 2 0 0 0-2-2Z" },
   { to: "/generate", label: "Generate using AI", end: false, d: "M12 2c0 5 4 9 9 9-5 0-9 4-9 9 0-5-4-9-9-9 5 0 9-4 9-9ZM19 2c0 2 1.5 3.5 3.5 3.5-2 0-3.5 1.5-3.5 3.5 0-2-1.5-3.5-3.5-3.5 2 0 3.5-1.5 3.5-3.5Z" },
   { to: "/import", label: "Import PDF", end: false, d: "M12 4v10m0 0 4-4m-4 4-4-4M5 18h14" },
   { to: "/search", label: "Search", end: true, d: "m20 20-3.5-3.5M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" },
@@ -124,6 +127,8 @@ export default function App() {
         <Route path="/change-password" element={<ForceChangePasswordPage />} />
         <Route path="/skills" element={<Shell><SkillsPage /></Shell>} />
         <Route path="/skills/:id" element={<Shell><SkillDetailPage /></Shell>} />
+        <Route path="/goals" element={<Shell><GoalsPage /></Shell>} />
+        <Route path="/goals/:id" element={<Shell><GoalDetailPage /></Shell>} />
         <Route path="/generate" element={<Shell><GenerateAIPage /></Shell>} />
         <Route path="/generate/preview" element={<Shell><AIPreviewPage /></Shell>} />
         <Route path="/import" element={<Shell><ImportPage /></Shell>} />
