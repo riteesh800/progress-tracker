@@ -104,7 +104,7 @@ func (s *Server) CreatePDFUploadURL(w http.ResponseWriter, r *http.Request, user
 	}
 
 	if body.FileSizeBytes > s.Cfg.MaxPDFBytes {
-		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 
@@ -192,7 +192,7 @@ func (s *Server) UploadToSignedStorage(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 	if declaredSize > s.Cfg.MaxPDFBytes {
-		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 
@@ -211,7 +211,7 @@ func (s *Server) UploadToSignedStorage(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 	if int64(len(raw)) > s.Cfg.MaxPDFBytes {
-		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 	if int64(len(raw)) != declaredSize {
@@ -263,7 +263,7 @@ func (s *Server) CompletePDFUpload(w http.ResponseWriter, r *http.Request, user 
 
 	if body.FileSizeBytes > s.Cfg.MaxPDFBytes {
 		s.cleanupStorageObject(r.Context(), body.ObjectKey)
-		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 
@@ -331,7 +331,7 @@ func (s *Server) CompletePDFUpload(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	if int64(len(raw)) > s.Cfg.MaxPDFBytes {
-		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 	if !bytes.HasPrefix(raw, []byte("%PDF")) {
@@ -473,14 +473,17 @@ func (s *Server) UploadPDF(w http.ResponseWriter, r *http.Request, user *models.
 	if clStr := strings.TrimSpace(r.Header.Get("Content-Length")); clStr != "" {
 		if cl, err := strconv.ParseInt(clStr, 10, 64); err == nil {
 			if cl > s.Cfg.MaxPDFBytes+65536 {
-				core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+				core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 				return
 			}
 		}
 	}
 
-	if err := r.ParseMultipartForm(s.Cfg.MaxPDFBytes + 1024*1024); err != nil {
-		core.WriteValidationError(w)
+	// Limit reader to prevent memory exhaustion or server crashes if someone streams massive files (e.g. 1 TB).
+	r.Body = http.MaxBytesReader(w, r.Body, s.Cfg.MaxPDFBytes+131072)
+
+	if err := r.ParseMultipartForm(s.Cfg.MaxPDFBytes + 65536); err != nil {
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -496,7 +499,7 @@ func (s *Server) UploadPDF(w http.ResponseWriter, r *http.Request, user *models.
 		return
 	}
 	if int64(len(raw)) > s.Cfg.MaxPDFBytes {
-		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 10 MB limit.")
+		core.WriteError(w, http.StatusBadRequest, "pdf_too_large", "PDF exceeds the 4.5 MB limit.")
 		return
 	}
 	if !bytes.HasPrefix(raw, []byte("%PDF")) {

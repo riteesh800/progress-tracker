@@ -94,7 +94,7 @@ func Load() *Settings {
 		SMTPPassword:              getEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:                  getEnv("SMTP_FROM", "noreply@example.com"),
 		Environment:               env,
-		MaxPDFBytes:               int64(getEnvInt("MAX_PDF_BYTES", 10*1024*1024)), // 10 MB
+		MaxPDFBytes:               int64(getEnvInt("MAX_PDF_BYTES", 4718592)), // 4.5 MB (4,718,592 bytes)
 		MaxPDFPages:               getEnvInt("MAX_PDF_PAGES", 200),
 		AdminEmail:                getEnv("ADMIN_EMAIL", "riteeritee251@gmail.com"),
 		AdminAccessCode:           getEnv("ADMIN_ACCESS_CODE", ""),
@@ -156,6 +156,11 @@ func (s *Settings) HasSupabaseStorage() bool {
 	return strings.TrimSpace(s.SupabaseURL) != "" &&
 		strings.TrimSpace(s.SupabaseServiceRoleKey) != "" &&
 		strings.TrimSpace(s.SupabaseStorageBucket) != ""
+}
+
+func (s *Settings) HasPartialSupabaseStorage() bool {
+	return strings.TrimSpace(s.SupabaseURL) != "" ||
+		strings.TrimSpace(s.SupabaseServiceRoleKey) != ""
 }
 
 // AllowsLocalSignedPDFStorage returns true ONLY in local development and automated test
@@ -372,8 +377,10 @@ func (s *Settings) AssertProductionSecrets() error {
 	if err := s.ValidateDatabaseConfig(); err != nil {
 		return err
 	}
-	if err := s.ValidateStorageConfig(); err != nil {
-		return err
+	if s.HasPartialSupabaseStorage() {
+		if err := s.ValidateStorageConfig(); err != nil {
+			return err
+		}
 	}
 	if weakSecrets[s.JWTSecret] || len(s.JWTSecret) < 32 {
 		return errors.New("JWT_SECRET must be set to a unique value of at least 32 characters in production.")

@@ -183,11 +183,11 @@ func TestPythonPDFBridgeEndToEnd(t *testing.T) {
 		t.Fatalf("expected 400 invalid_pdf, got %d %v", code, errData)
 	}
 
-	// 1b. Reject PDF exceeding 10 MB -> 400 pdf_too_large
+	// 1b. Reject PDF exceeding 4.5 MB -> 400 pdf_too_large
 	oversizedPDF := append([]byte("%PDF-1.4\n"), bytes.Repeat([]byte("A"), int(env.Cfg.MaxPDFBytes)+1)...)
 	code, errData, _ = env.DoMultipartPDF("/pdf/upload", "huge.pdf", oversizedPDF, AuthHeader(tokenA))
 	if code != http.StatusBadRequest || errData["code"] != "pdf_too_large" {
-		t.Fatalf("expected 400 pdf_too_large for >10 MB PDF, got %d %v", code, errData)
+		t.Fatalf("expected 400 pdf_too_large for >4.5 MB PDF, got %d %v", code, errData)
 	}
 
 	// 2. Upload real multi-line syllabus PDF -> parsed by existing Python pdf_parser.py via pybridge!
@@ -260,24 +260,24 @@ func TestStorageBased10MBPDFUploadAndSecurity(t *testing.T) {
 		t.Fatalf("expected 400 invalid_pdf for path traversal filename, got %d %v", code, errData)
 	}
 
-	// 2. Reject > 10 MB (10,485,761 bytes) on /pdf/upload-url -> 400 pdf_too_large
+	// 2. Reject > 4.5 MB (4,718,593 bytes) on /pdf/upload-url -> 400 pdf_too_large
 	code, errData, _ = env.DoJSON(http.MethodPost, "/pdf/upload-url", map[string]any{
-		"filename":        "over10mb.pdf",
+		"filename":        "over4_5mb.pdf",
 		"content_type":    "application/pdf",
-		"file_size_bytes": 10*1024*1024 + 1,
+		"file_size_bytes": env.Cfg.MaxPDFBytes + 1,
 	}, AuthHeader(tokenA))
 	if code != http.StatusBadRequest || errData["code"] != "pdf_too_large" {
-		t.Fatalf("expected 400 pdf_too_large for >10 MB on /pdf/upload-url, got %d %v", code, errData)
+		t.Fatalf("expected 400 pdf_too_large for >4.5 MB on /pdf/upload-url, got %d %v", code, errData)
 	}
 
-	// 3. Test 4.5 MB PDF (4,718,592 bytes) and exact 10 MB PDF (10,485,760 bytes) via signed storage upload flow
+	// 3. Test 1 MB PDF and 4.5 MB PDF (4,718,592 bytes) via signed storage upload flow
 	for _, tc := range []struct {
 		name      string
 		sizeBytes int
 		skillName string
 	}{
-		{name: "4.5MB_syllabus.pdf", sizeBytes: int(4.5 * 1024 * 1024), skillName: "Networks 4.5MB"},
-		{name: "10MB_syllabus.pdf", sizeBytes: 10 * 1024 * 1024, skillName: "Networks 10MB"},
+		{name: "1MB_syllabus.pdf", sizeBytes: 1024 * 1024, skillName: "Networks 1MB"},
+		{name: "4.5MB_syllabus.pdf", sizeBytes: int(env.Cfg.MaxPDFBytes), skillName: "Networks 4.5MB"},
 	} {
 		pdfBytes := generateValidSyllabusPDFBytesWithSize(t, env, tc.sizeBytes)
 		if len(pdfBytes) != tc.sizeBytes {
@@ -557,13 +557,13 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	env.Cfg.SupabaseStorageBucket = "pdf-imports"
 	env.Cfg.PythonParserURL = pyServer.URL
 
-	pdf10MB := generateValidSyllabusPDFBytesWithSize(t, env, 10*1024*1024)
+	pdfPayload := generateValidSyllabusPDFBytesWithSize(t, env, int(env.Cfg.MaxPDFBytes))
 
 	// Step 1: Request Supabase signed upload URL
 	code, urlOut, _ := env.DoJSON(http.MethodPost, "/pdf/upload-url", map[string]any{
-		"filename":        "supabase_10mb.pdf",
+		"filename":        "supabase_4_5mb.pdf",
 		"content_type":    "application/pdf",
-		"file_size_bytes": len(pdf10MB),
+		"file_size_bytes": len(pdfPayload),
 	}, AuthHeader(token))
 	if code != http.StatusOK || urlOut["storage_provider"] != "supabase" {
 		t.Fatalf("expected supabase signed upload URL, got %d %v", code, urlOut)
@@ -572,8 +572,8 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	objectKey, _ := urlOut["object_key"].(string)
 	uploadToken, _ := urlOut["upload_token"].(string)
 
-	// Step 2: Frontend uploads 10 MB PDF directly to Supabase Storage signed URL (bypassing Go server!)
-	putReq, _ := http.NewRequest(http.MethodPut, uploadURL, bytes.NewReader(pdf10MB))
+	// Step 2: Frontend uploads PDF directly to Supabase Storage signed URL (bypassing Go server!)
+	putReq, _ := http.NewRequest(http.MethodPut, uploadURL, bytes.NewReader(pdfPayload))
 	putReq.Header.Set("Content-Type", "application/pdf")
 	putRes, err := http.DefaultClient.Do(putReq)
 	if err != nil || putRes.StatusCode != http.StatusOK {
@@ -581,15 +581,15 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	}
 	_ = putRes.Body.Close()
 
-	// Step 3: Frontend notifies Go (/pdf/upload-complete) with small JSON body; Python fetches 10 MB PDF from Supabase Storage and parses it; Go deletes object from Supabase Storage
+	// Step 3: Frontend notifies Go (/pdf/upload-complete) with small JSON body; Python fetches PDF from Supabase Storage and parses it; Go deletes object from Supabase Storage
 	codeComp, jobOut, rawComp := env.DoJSON(http.MethodPost, "/pdf/upload-complete", map[string]any{
 		"object_key":        objectKey,
-		"original_filename": "supabase_10mb.pdf",
-		"file_size_bytes":   len(pdf10MB),
+		"original_filename": "supabase_4_5mb.pdf",
+		"file_size_bytes":   len(pdfPayload),
 		"upload_token":      uploadToken,
 	}, AuthHeader(token))
 	if codeComp != http.StatusOK || jobOut["status"] != "ready_for_preview" {
-		t.Fatalf("supabase 10MB upload-complete failed: %d %s", codeComp, string(rawComp))
+		t.Fatalf("supabase upload-complete failed: %d %s", codeComp, string(rawComp))
 	}
 
 	mu.Lock()

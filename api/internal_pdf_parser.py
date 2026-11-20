@@ -108,7 +108,7 @@ def _fetch_pdf_from_storage(download_url: str, max_bytes: int) -> tuple[bytes | 
         return None, {
             "ok": False,
             "error_code": "pdf_too_large",
-            "error_message": "PDF exceeds the 10 MB limit.",
+            "error_message": "PDF exceeds the 4.5 MB limit.",
         }
     if not data.startswith(b"%PDF"):
         return None, {
@@ -151,10 +151,10 @@ class handler(BaseHTTPRequestHandler):
             self._send_json(403, {"ok": False, "error_message": "Internal bridge request timestamp expired."})
             return
 
-        max_bytes = int(os.environ.get("MAX_PDF_BYTES", str(10 * 1024 * 1024)))
+        max_bytes = int(os.environ.get("MAX_PDF_BYTES", str(4718592)))
         content_length = int(self.headers.get("Content-Length") or "0")
         if content_length <= 0 or content_length > max_bytes:
-            self._send_json(400, {"ok": False, "error_code": "pdf_too_large", "error_message": "PDF exceeds the 10 MB limit."})
+            self._send_json(400, {"ok": False, "error_code": "pdf_too_large", "error_message": "PDF exceeds the 4.5 MB limit."})
             return
 
         raw_body = self.rfile.read(content_length)
@@ -183,7 +183,7 @@ class handler(BaseHTTPRequestHandler):
         else:
             raw_pdf = raw_body
             if len(raw_pdf) > max_bytes:
-                self._send_json(400, {"ok": False, "error_code": "pdf_too_large", "error_message": "PDF exceeds the 10 MB limit."})
+                self._send_json(400, {"ok": False, "error_code": "pdf_too_large", "error_message": "PDF exceeds the 4.5 MB limit."})
                 return
             if not raw_pdf.startswith(b"%PDF"):
                 self._send_json(400, {"ok": False, "error_code": "invalid_pdf", "error_message": "File is not a valid PDF (content-type/magic mismatch)."})

@@ -29,7 +29,7 @@ function PdfUploadArt() {
   );
 }
 
-const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_PDF_SIZE_BYTES = Math.floor(4.5 * 1024 * 1024); // 4.5 MB
 
 function UploadCard({
   onFile,
@@ -111,7 +111,7 @@ function UploadCard({
         >
           {uploading ? "Uploading…" : "Upload to edit"}
         </button>
-        <p className="muted import-hint">Upload documents up to 10 MB in PDF</p>
+        <p className="muted import-hint">Upload documents up to 4.5 MB in PDF (upload &lt; 4.5 MB files)</p>
         {error && <p className="error import-error">{error}</p>}
       </div>
     </div>
@@ -245,7 +245,7 @@ export default function ImportPage() {
   async function onFile(file: File) {
     setError("");
     if (file.size > MAX_PDF_SIZE_BYTES) {
-      setError("File size exceeds 10 MB. Please upload a PDF smaller than 10 MB.");
+      setError("File size exceeds 4.5 MB. Please upload a PDF smaller than 4.5 MB.");
       return;
     }
     setUploading(true);

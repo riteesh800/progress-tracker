@@ -52,7 +52,7 @@ func NewTestEnv(t *testing.T) *TestEnv {
 		GeminiModel:               "gemini-3.8-flash",
 		CORSOrigins:               "http://localhost:5173",
 		Environment:               "test",
-		MaxPDFBytes:               10 * 1024 * 1024, // 10 MB
+		MaxPDFBytes:               4718592, // 4.5 MB
 		MaxPDFPages:               80,
 		AdminEmail:                core.AdminEmail,
 		AdminAccessCode:           "test-admin-secret-code-12345",

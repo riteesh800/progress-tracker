@@ -668,23 +668,34 @@ func TestProductionDatabaseAndSecretValidation(t *testing.T) {
 		t.Fatalf("expected INTERNAL_PARSER_SECRET equal to CLEANUP_SECRET to fail in production")
 	}
 
-	// 7. Production MUST require SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_STORAGE_BUCKET
-	noSupaURL := baseProdCfg()
-	noSupaURL.SupabaseURL = ""
-	if err := noSupaURL.AssertProductionSecrets(); err == nil {
-		t.Fatalf("expected production with missing SUPABASE_URL to fail")
+	// 7. Supabase Storage is optional in production for direct <=4.5 MB uploads,
+	// but if partially configured it must be complete (URL, service role key, and bucket).
+	zeroStorage := baseProdCfg()
+	zeroStorage.SupabaseURL = ""
+	zeroStorage.SupabaseServiceRoleKey = ""
+	if err := zeroStorage.AssertProductionSecrets(); err != nil {
+		t.Fatalf("expected production without Supabase Storage to pass for direct <=4.5MB uploads, got: %v", err)
 	}
-	noSupaKey := baseProdCfg()
-	noSupaKey.SupabaseServiceRoleKey = ""
-	if err := noSupaKey.AssertProductionSecrets(); err == nil {
-		t.Fatalf("expected production with missing SUPABASE_SERVICE_ROLE_KEY to fail")
+
+	partialURL := baseProdCfg()
+	partialURL.SupabaseServiceRoleKey = ""
+	if err := partialURL.AssertProductionSecrets(); err == nil {
+		t.Fatalf("expected production with partial Supabase config (missing service role key) to fail")
 	}
-	noSupaBucket := baseProdCfg()
-	noSupaBucket.SupabaseStorageBucket = ""
-	if err := noSupaBucket.AssertProductionSecrets(); err == nil {
-		t.Fatalf("expected production with missing SUPABASE_STORAGE_BUCKET to fail")
+
+	partialKey := baseProdCfg()
+	partialKey.SupabaseURL = ""
+	if err := partialKey.AssertProductionSecrets(); err == nil {
+		t.Fatalf("expected production with partial Supabase config (missing URL) to fail")
 	}
-	if noSupaURL.AllowsLocalSignedPDFStorage() {
+
+	partialBucket := baseProdCfg()
+	partialBucket.SupabaseStorageBucket = ""
+	if err := partialBucket.AssertProductionSecrets(); err == nil {
+		t.Fatalf("expected production with partial Supabase config (missing bucket) to fail")
+	}
+
+	if zeroStorage.AllowsLocalSignedPDFStorage() {
 		t.Fatalf("production must never allow local_signed PDF storage fallback")
 	}
 }

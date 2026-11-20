@@ -476,11 +476,11 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	env.Cfg.SupabaseStorageBucket = "pdf-imports"
 	env.Cfg.PythonParserURL = pyServer.URL
 
-	pdf10MB := generateValidSyllabusPDFBytesWithSize(t, env, 10*1024*1024)
+	pdfPayload := generateValidSyllabusPDFBytesWithSize(t, env, int(env.Cfg.MaxPDFBytes))
 	code, urlOut, rawURLOut := env.DoJSON(http.MethodPost, "/pdf/upload-url", map[string]any{
-		"filename":        "pg_10mb_syllabus.pdf",
+		"filename":        "pg_4_5mb_syllabus.pdf",
 		"content_type":    "application/pdf",
-		"file_size_bytes": len(pdf10MB),
+		"file_size_bytes": len(pdfPayload),
 	}, AuthHeader(tokenA))
 	if code != http.StatusOK {
 		t.Fatalf("PostgreSQL /pdf/upload-url failed: %d %s", code, string(rawURLOut))
@@ -489,18 +489,18 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	objectKey, _ := urlOut["object_key"].(string)
 	uploadToken, _ := urlOut["upload_token"].(string)
 
-	putReq, _ := http.NewRequest(http.MethodPut, uploadURL, bytes.NewReader(pdf10MB))
+	putReq, _ := http.NewRequest(http.MethodPut, uploadURL, bytes.NewReader(pdfPayload))
 	putReq.Header.Set("Content-Type", "application/pdf")
 	putRes, err := http.DefaultClient.Do(putReq)
 	if err != nil || putRes.StatusCode != http.StatusOK {
-		t.Fatalf("PostgreSQL 10MB PUT failed: %v", err)
+		t.Fatalf("PostgreSQL PUT failed: %v", err)
 	}
 	_ = putRes.Body.Close()
 
 	code, jobOut, rawJob := env.DoJSON(http.MethodPost, "/pdf/upload-complete", map[string]any{
 		"object_key":        objectKey,
-		"original_filename": "pg_10mb_syllabus.pdf",
-		"file_size_bytes":   len(pdf10MB),
+		"original_filename": "pg_4_5mb_syllabus.pdf",
+		"file_size_bytes":   len(pdfPayload),
 		"upload_token":      uploadToken,
 	}, AuthHeader(tokenA))
 	if code != http.StatusOK || jobOut["status"] != "ready_for_preview" {
@@ -515,8 +515,8 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	}
 	code, _, _ = env.DoJSON(http.MethodPost, "/pdf/upload-complete", map[string]any{
 		"object_key":        objectKey,
-		"original_filename": "pg_10mb_syllabus.pdf",
-		"file_size_bytes":   len(pdf10MB),
+		"original_filename": "pg_4_5mb_syllabus.pdf",
+		"file_size_bytes":   len(pdfPayload),
 		"upload_token":      uploadToken,
 	}, AuthHeader(tokenB))
 	if code != http.StatusForbidden {
