@@ -183,7 +183,7 @@ export default function GoalDetailPage() {
       <section className="card goal-time-centerpiece" aria-label="Live Clock and Target Countdown">
         <div className="goal-time-clock-area">
           <div className="goal-time-section-label">
-            <span>Local Computer Time</span>
+            <span>Time is running, are you?</span>
           </div>
           <LiveClock />
         </div>
