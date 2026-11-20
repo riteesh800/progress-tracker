@@ -223,7 +223,6 @@ export default function GoalsPage() {
                   required
                   autoFocus
                 />
-                <span className="muted field-hint">{100 - goalName.length} characters left</span>
               </div>
 
               {/* Input 2: Deadline (complete date and time picker) */}
@@ -256,9 +255,6 @@ export default function GoalsPage() {
                   onChange={(e) => setMotivationLine(e.target.value.slice(0, 200))}
                   maxLength={200}
                 />
-                <span className="muted field-hint">
-                  {200 - motivationLine.length} characters left
-                </span>
               </div>
 
               <div className="goal-modal-actions">
