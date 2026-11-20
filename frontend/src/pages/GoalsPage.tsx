@@ -1,29 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listGoals, createGoal, deleteGoal, type Goal } from "../api/goals.api";
 import { ApiError } from "../api/client";
 import ConfirmDialog from "../components/ConfirmDialog";
 
+const getMinDateTime = () => {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+
 export default function GoalsPage() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["goals"], queryFn: listGoals });
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [minDateTime, setMinDateTime] = useState("");
   const [goalName, setGoalName] = useState("");
   const [deadlineAt, setDeadlineAt] = useState("");
   const [motivationLine, setMotivationLine] = useState("");
   const [formError, setFormError] = useState("");
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
+  const openModal = () => {
+    setMinDateTime(getMinDateTime());
+    setFormError("");
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setFormError("");
+    setMinDateTime("");
+  };
+
+  useEffect(() => {
+    if (modalOpen && !minDateTime) {
+      setMinDateTime(getMinDateTime());
+    }
+  }, [modalOpen, minDateTime]);
+
+  const isPastDeadline = (val: string) => {
+    if (!val) return false;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    now.setSeconds(0, 0);
+    return d.getTime() < now.getTime() - 60 * 1000;
+  };
+
   const createMut = useMutation({
     mutationFn: createGoal,
     onSuccess: () => {
-      setModalOpen(false);
+      closeModal();
       setGoalName("");
       setDeadlineAt("");
       setMotivationLine("");
-      setFormError("");
       qc.invalidateQueries({ queryKey: ["goals"] });
     },
     onError: (err) => {
@@ -58,6 +91,10 @@ export default function GoalsPage() {
     const d = new Date(deadlineAt);
     if (isNaN(d.getTime())) {
       setFormError("Invalid deadline date and time.");
+      return;
+    }
+    if (isPastDeadline(deadlineAt)) {
+      setFormError("Deadline must be today or in the future (cannot be in the past or earlier than current time).");
       return;
     }
     if (motivationLine.trim().length > 200) {
@@ -101,10 +138,7 @@ export default function GoalsPage() {
         <button
           type="button"
           className="primary goals-create-btn"
-          onClick={() => {
-            setModalOpen(true);
-            setFormError("");
-          }}
+          onClick={openModal}
         >
           + Create Goal
         </button>
@@ -122,7 +156,7 @@ export default function GoalsPage() {
           <button
             type="button"
             className="primary"
-            onClick={() => setModalOpen(true)}
+            onClick={openModal}
             style={{ marginTop: "1rem" }}
           >
             Create Your First Goal
@@ -188,7 +222,7 @@ export default function GoalsPage() {
       {modalOpen && (
         <div
           className="goal-modal-overlay"
-          onClick={() => setModalOpen(false)}
+          onClick={closeModal}
           role="dialog"
           aria-modal="true"
         >
@@ -198,7 +232,7 @@ export default function GoalsPage() {
               <button
                 type="button"
                 className="goal-modal-close"
-                onClick={() => setModalOpen(false)}
+                onClick={closeModal}
                 aria-label="Close modal"
               >
                 ✕
@@ -233,12 +267,21 @@ export default function GoalsPage() {
                 <input
                   id="goal-deadline-input"
                   type="datetime-local"
+                  min={minDateTime || getMinDateTime()}
                   value={deadlineAt}
-                  onChange={(e) => setDeadlineAt(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDeadlineAt(val);
+                    if (val && isPastDeadline(val)) {
+                      setFormError("Deadline must be today or in the future (cannot be in the past or earlier than current time).");
+                    } else if (formError.includes("Deadline")) {
+                      setFormError("");
+                    }
+                  }}
                   required
                 />
                 <span className="muted field-hint">
-                  Select the exact year, month, date, hour, and minute
+                  Select a deadline date and time today or in the future
                 </span>
               </div>
 
@@ -261,7 +304,7 @@ export default function GoalsPage() {
                 <button
                   type="button"
                   className="secondary"
-                  onClick={() => setModalOpen(false)}
+                  onClick={closeModal}
                   disabled={createMut.isPending}
                 >
                   Cancel
@@ -269,7 +312,7 @@ export default function GoalsPage() {
                 <button
                   type="submit"
                   className="primary"
-                  disabled={createMut.isPending || !goalName.trim() || !deadlineAt}
+                  disabled={createMut.isPending || !goalName.trim() || !deadlineAt || isPastDeadline(deadlineAt)}
                 >
                   {createMut.isPending ? "Creating Goal…" : "Create Goal"}
                 </button>
