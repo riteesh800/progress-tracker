@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listGoals, createGoal, deleteGoal, type Goal } from "../api/goals.api";
 import { ApiError } from "../api/client";
@@ -12,6 +12,7 @@ const getMinDateTime = () => {
 };
 
 export default function GoalsPage() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["goals"], queryFn: listGoals });
 
@@ -168,12 +169,24 @@ export default function GoalsPage() {
             const isDeadlinePassed = new Date(g.deadline_at).getTime() <= Date.now();
 
             return (
-              <div key={g.id} className="card goal-card">
+              <div
+                key={g.id}
+                className="card goal-card"
+                onClick={() => navigate(`/goals/${g.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    navigate(`/goals/${g.id}`);
+                  }
+                }}
+              >
                 <div className="goal-card-header">
                   <div className="goal-card-title-wrap">
-                    <Link to={`/goals/${g.id}`} className="goal-card-name" title={g.goal_name}>
+                    <span className="goal-card-name" title={g.goal_name}>
                       {g.goal_name}
-                    </Link>
+                    </span>
                     {isDeadlinePassed ? (
                       <span className="goal-badge reached">🏁 Deadline Reached</span>
                     ) : (
@@ -200,14 +213,17 @@ export default function GoalsPage() {
                 </div>
 
                 <div className="goal-card-actions">
-                  <Link to={`/goals/${g.id}`} className="button primary goal-card-view-btn">
-                    Open Dashboard →
-                  </Link>
                   <button
                     type="button"
-                    className="secondary goal-card-del-btn"
+                    className="goal-card-del-btn"
                     title="Move to Trash"
-                    onClick={() => setPendingDelete({ id: g.id, name: g.goal_name })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDelete({ id: g.id, name: g.goal_name });
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                    }}
                   >
                     Delete
                   </button>
