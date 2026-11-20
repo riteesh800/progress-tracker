@@ -1,30 +1,26 @@
 import { useState, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getGoal,
   listGoalActivities,
   getGoalProgress,
   addGoalActivity,
-  deleteGoal,
 } from "../api/goals.api";
 import { LiveClock } from "../components/goals/LiveClock";
 import { CountdownTimer } from "../components/goals/CountdownTimer";
 import { InactivityWarning } from "../components/goals/InactivityWarning";
 import { ActivityCards } from "../components/goals/ActivityCards";
 import { GoalProgressGraph } from "../components/goals/GoalProgressGraph";
-import ConfirmDialog from "../components/ConfirmDialog";
 import { ApiError } from "../api/client";
 
 export default function GoalDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [page, setPage] = useState(1);
   const perPage = 50;
   const [addError, setAddError] = useState("");
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Queries
   const goalQuery = useQuery({
@@ -36,6 +32,12 @@ export default function GoalDetailPage() {
   const activitiesQuery = useQuery({
     queryKey: ["goal-activities", id, page],
     queryFn: () => (id ? listGoalActivities(id, page, perPage) : Promise.reject("no id")),
+    enabled: Boolean(id),
+  });
+
+  const latestActivityQuery = useQuery({
+    queryKey: ["goal-latest-activity", id],
+    queryFn: () => (id ? listGoalActivities(id, 1, 1) : Promise.reject("no id")),
     enabled: Boolean(id),
   });
 
@@ -55,23 +57,12 @@ export default function GoalDetailPage() {
       setAddError("");
       qc.invalidateQueries({ queryKey: ["goal", id] });
       qc.invalidateQueries({ queryKey: ["goal-activities", id] });
+      qc.invalidateQueries({ queryKey: ["goal-latest-activity", id] });
       qc.invalidateQueries({ queryKey: ["goal-progress", id] });
       qc.invalidateQueries({ queryKey: ["goals"] });
     },
     onError: (err) => {
       setAddError(err instanceof ApiError ? err.message : "Failed to add activity. Try again.");
-    },
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: () => {
-      if (!id) throw new Error("Missing goal id");
-      return deleteGoal(id);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["goals"] });
-      qc.invalidateQueries({ queryKey: ["goals-trash"] });
-      navigate("/goals");
     },
   });
 
@@ -95,33 +86,28 @@ export default function GoalDetailPage() {
 
   const { goal, summary, inactivity_warning, is_deadline_reached } = goalQuery.data;
 
-  // Format deadline date for header
-  const formattedDeadline = new Date(goal.deadline_at).toLocaleString(undefined, {
-    dateStyle: "full",
-    timeStyle: "short",
-  });
-
   const activities = activitiesQuery.data?.activities || [];
   const totalActivities = activitiesQuery.data?.total || 0;
   const progressData = progressQuery.data;
 
+  // Inactivity tracking: days since last activity card added, or since goal creation if no cards added yet
+  const latestActivity = latestActivityQuery.data?.activities?.[0] || activities[0];
+  let latestTime: number | null = null;
+  if (latestActivity?.created_at) {
+    const t = new Date(latestActivity.created_at).getTime();
+    if (!isNaN(t)) latestTime = t;
+  }
+  if (!latestTime && goal.created_at) {
+    const t = new Date(goal.created_at).getTime();
+    if (!isNaN(t)) latestTime = t;
+  }
+
+  const elapsedMs = latestTime ? Math.max(0, Date.now() - latestTime) : 0;
+  const elapsedHours = elapsedMs / (1000 * 60 * 60);
+  const inactiveDays = Math.floor(elapsedHours / 24);
+
   return (
     <div className="goal-detail-page">
-      {/* Top Navigation & Breadcrumb */}
-      <div className="goal-detail-nav">
-        <Link to="/goals" className="goal-back-link">
-          ← Back to Goals
-        </Link>
-        <button
-          type="button"
-          className="secondary goal-delete-top-btn"
-          onClick={() => setDeleteConfirmOpen(true)}
-          title="Move goal to Trash"
-        >
-          🗑️ Move to Trash
-        </button>
-      </div>
-
       {/* Main Goal Heading */}
       <header className="goal-detail-header">
         <div className="goal-detail-heading-wrap">
@@ -133,11 +119,19 @@ export default function GoalDetailPage() {
           )}
         </div>
 
-        <div className="goal-detail-deadline-chip">
-          <span className="muted">Target Deadline:</span>
-          <strong>{formattedDeadline}</strong>
-          <span className="goal-detail-tz">({goal.timezone})</span>
-        </div>
+        {inactiveDays >= 1 ? (
+          <div className="goal-detail-status-chip warning" role="status">
+            <span aria-hidden>⚠️</span>
+            <span>
+              You did nothing from {inactiveDays} {inactiveDays === 1 ? "day" : "days"} to reach this goal.
+            </span>
+          </div>
+        ) : (
+          <div className="goal-detail-status-chip on-track" role="status">
+            <span aria-hidden>✨</span>
+            <span>On track • Active in last 24h</span>
+          </div>
+        )}
       </header>
 
       {/* Three-Day Inactivity Warning */}
@@ -230,18 +224,6 @@ export default function GoalDetailPage() {
         missedDays={progressData?.missed_days || 0}
         totalTrackedDays={progressData?.total_tracked_days || 0}
         isDeadlineReached={is_deadline_reached}
-      />
-
-      {/* Confirm Move to Trash Dialog */}
-      <ConfirmDialog
-        open={deleteConfirmOpen}
-        title="Move Goal to Trash"
-        body={`Are you sure you want to delete "${goal.goal_name}"? It will be held in Trash for 3 days before permanent deletion.`}
-        confirmLabel={deleteMut.isPending ? "Moving to Trash…" : "Move to Trash"}
-        danger
-        busy={deleteMut.isPending}
-        onCancel={() => setDeleteConfirmOpen(false)}
-        onConfirm={() => deleteMut.mutate()}
       />
     </div>
   );
