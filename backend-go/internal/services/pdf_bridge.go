@@ -315,25 +315,56 @@ func InvokePythonPDFParserFromStorageURL(ctx context.Context, cfg *config.Settin
 
 	req, err := http.NewRequestWithContext(timeoutCtx, http.MethodPost, parserURL, bytes.NewReader(payloadBytes))
 	if err != nil {
+		core.Logger.Error("Remote PDF parser storage request creation failed", "err", err, "url", parserURL)
 		return nil, "internal_error", "Parsing failed. The file was not stored as a skill."
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Internal-Bridge-Timestamp", ts)
 	req.Header.Set("X-Internal-Bridge-Signature", sig)
+	if bypass := strings.TrimSpace(os.Getenv("VERCEL_AUTOMATION_BYPASS_SECRET")); bypass != "" {
+		req.Header.Set("x-vercel-protection-bypass", bypass)
+	} else if bypass := strings.TrimSpace(os.Getenv("VERCEL_PROTECTION_BYPASS")); bypass != "" {
+		req.Header.Set("x-vercel-protection-bypass", bypass)
+	}
 
-	client := &http.Client{Timeout: 45 * time.Second}
+	client := &http.Client{
+		Timeout: 45 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	res, err := client.Do(req)
 	if err != nil {
+		core.Logger.Error("Remote PDF parser storage request failed", "err", err, "url", parserURL)
 		return nil, "internal_error", "Parsing failed. The file was not stored as a skill."
 	}
 	defer res.Body.Close()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
+		core.Logger.Error("Remote PDF parser storage read body failed", "err", err, "status", res.StatusCode)
 		return nil, "internal_error", "Parsing failed. The file was not stored as a skill."
 	}
+
+	if res.StatusCode != http.StatusOK {
+		core.Logger.Error("Remote PDF parser storage non-200 response", "status", res.StatusCode, "url", parserURL, "body", string(bodyBytes))
+		var errResp bridgeOutput
+		if json.Unmarshal(bodyBytes, &errResp) == nil && strings.TrimSpace(errResp.ErrorMessage) != "" {
+			code := errResp.ErrorCode
+			if code == "" {
+				code = "internal_error"
+			}
+			return nil, code, errResp.ErrorMessage
+		}
+		if res.StatusCode == http.StatusFound || res.StatusCode == http.StatusMovedPermanently || res.StatusCode == http.StatusTemporaryRedirect {
+			return nil, "internal_error", "PDF parser endpoint was redirected. Please check Vercel deployment protection or PYTHON_PARSER_URL."
+		}
+		return nil, "internal_error", fmt.Sprintf("PDF parser service error (HTTP %d).", res.StatusCode)
+	}
+
 	var resp bridgeOutput
 	if err := json.Unmarshal(bodyBytes, &resp); err != nil {
+		core.Logger.Error("Remote PDF parser storage invalid JSON response", "err", err, "status", res.StatusCode, "body", string(bodyBytes))
 		return nil, "internal_error", "Parsing failed. The file was not stored as a skill."
 	}
 	if !resp.OK {
@@ -409,25 +440,52 @@ func invokeRemotePythonBridge(ctx context.Context, cfg *config.Settings, parserU
 
 	req, err := http.NewRequestWithContext(timeoutCtx, http.MethodPost, parserURL, bytes.NewReader(rawPDF))
 	if err != nil {
+		core.Logger.Error("Remote PDF parser request construction failed", "err", err, "url", parserURL)
 		return nil, "Parsing failed. The file was not stored as a skill."
 	}
 	req.Header.Set("Content-Type", "application/pdf")
 	req.Header.Set("X-Internal-Bridge-Timestamp", ts)
 	req.Header.Set("X-Internal-Bridge-Signature", sig)
+	if bypass := strings.TrimSpace(os.Getenv("VERCEL_AUTOMATION_BYPASS_SECRET")); bypass != "" {
+		req.Header.Set("x-vercel-protection-bypass", bypass)
+	} else if bypass := strings.TrimSpace(os.Getenv("VERCEL_PROTECTION_BYPASS")); bypass != "" {
+		req.Header.Set("x-vercel-protection-bypass", bypass)
+	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	res, err := client.Do(req)
 	if err != nil {
+		core.Logger.Error("Remote PDF parser request failed", "err", err, "url", parserURL)
 		return nil, "Parsing failed. The file was not stored as a skill."
 	}
 	defer res.Body.Close()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
+		core.Logger.Error("Remote PDF parser failed to read response body", "err", err, "status", res.StatusCode)
 		return nil, "Parsing failed. The file was not stored as a skill."
 	}
+
+	if res.StatusCode != http.StatusOK {
+		core.Logger.Error("Remote PDF parser non-200 response", "status", res.StatusCode, "url", parserURL, "body", string(bodyBytes))
+		var errResp bridgeOutput
+		if json.Unmarshal(bodyBytes, &errResp) == nil && strings.TrimSpace(errResp.ErrorMessage) != "" {
+			return nil, errResp.ErrorMessage
+		}
+		if res.StatusCode == http.StatusFound || res.StatusCode == http.StatusMovedPermanently || res.StatusCode == http.StatusTemporaryRedirect {
+			return nil, "PDF parser endpoint was redirected. Please check Vercel deployment protection or PYTHON_PARSER_URL."
+		}
+		return nil, fmt.Sprintf("PDF parser service error (HTTP %d).", res.StatusCode)
+	}
+
 	var resp bridgeOutput
 	if err := json.Unmarshal(bodyBytes, &resp); err != nil {
+		core.Logger.Error("Remote PDF parser invalid JSON response", "err", err, "status", res.StatusCode, "body", string(bodyBytes))
 		return nil, "Parsing failed. The file was not stored as a skill."
 	}
 	if !resp.OK {

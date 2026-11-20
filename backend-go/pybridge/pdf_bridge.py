@@ -40,10 +40,10 @@ def extract_and_parse_pdf(
     try:
         reader = PdfReader(io.BytesIO(raw_bytes))
         pages = len(reader.pages)
-    except Exception:
+    except Exception as exc:
         return {
             "ok": False,
-            "error_message": "Parsing failed. The file was not stored as a skill.",
+            "error_message": f"Could not read PDF ({exc}). The file was not stored as a skill.",
         }
 
     if pages > max_pdf_pages:
@@ -71,10 +71,10 @@ def extract_and_parse_pdf(
 
     try:
         tree = parse_syllabus_text(text)
-    except Exception:
+    except Exception as exc:
         return {
             "ok": False,
-            "error_message": "Parsing failed. The file was not stored as a skill.",
+            "error_message": f"Parsing failed ({exc}). The file was not stored as a skill.",
         }
 
     sections = tree.get("low_confidence_sections") or []

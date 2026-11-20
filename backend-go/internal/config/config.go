@@ -141,7 +141,7 @@ func (s *Settings) EffectivePythonParserURL() string {
 	if u := strings.TrimSpace(s.PythonParserURL); u != "" {
 		return u
 	}
-	for _, envKey := range []string{"VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
+	for _, envKey := range []string{"VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_BRANCH_URL", "VERCEL_URL"} {
 		if host := strings.TrimRight(strings.TrimSpace(os.Getenv(envKey)), "/"); host != "" {
 			if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
 				host = "https://" + host

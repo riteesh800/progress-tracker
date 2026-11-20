@@ -129,6 +129,12 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
     def do_POST(self) -> None:  # noqa: N802
+        try:
+            self._handle_post()
+        except Exception as exc:
+            self._send_json(500, {"ok": False, "error_message": f"Internal parser error: {exc}"})
+
+    def _handle_post(self) -> None:
         # Strictly require dedicated INTERNAL_PARSER_SECRET; never fall back to JWT/CLEANUP/CRON secrets.
         secret = (os.environ.get("INTERNAL_PARSER_SECRET") or "").strip()
         if not secret:
