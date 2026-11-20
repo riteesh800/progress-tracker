@@ -36,7 +36,7 @@ export default function NotesPanel({ topicId, topicName }: { topicId: string; to
       {q.data?.map((n) => (
         <div key={n.id} className="row" style={{ marginBottom: 6 }}>
           <pre style={{ whiteSpace: "pre-wrap", flex: 1, margin: 0 }}>{n.content}</pre>
-          <button className="danger" onClick={() => deleteNote(n.id).then(() => qc.invalidateQueries({ queryKey: ["notes", topicId] }))}>
+          <button className="danger" onClick={() => deleteNote(n.id).then(() => { qc.invalidateQueries({ queryKey: ["notes", topicId] }); qc.invalidateQueries({ queryKey: ["activity"] }); })}>
             Delete
           </button>
         </div>

@@ -6,6 +6,7 @@ import { completeTopic, createTopic } from "../api/topics.api";
 import { insertChildTopic, isLeafNode } from "../lib/topicTree";
 import { LineBar } from "./ProgressVisuals";
 import NotesPanel from "./NotesPanel";
+import { ApiError } from "../api/client";
 
 export default function TopicTree({ nodes, skillId }: { nodes: TopicNode[]; skillId: string }) {
   return (
@@ -39,6 +40,7 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [childName, setChildName] = useState("");
+  const [childError, setChildError] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const isLeaf = isLeafNode(node);
   const notesQuery = useQuery({ queryKey: ["notes", node.id], queryFn: () => listNotes(node.id), staleTime: 2 * 60 * 1000, enabled: showNotes });
@@ -63,15 +65,21 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
 
   async function addChild(e?: FormEvent) {
     e?.preventDefault();
-    if (!childName.trim()) return;
-    const created = await createTopic({ skill_id: skillId, parent_id: node.id, name: childName.trim() });
-    qc.setQueryData<TopicNode[]>(["topics", skillId], (current) =>
-      current ? insertChildTopic(current, node.id, created) : current,
-    );
-    setChildName("");
-    setAdding(false);
-    setOpen(true);
-    await refresh();
+    const clean = childName.trim();
+    if (!clean) return;
+    setChildError("");
+    try {
+      const created = await createTopic({ skill_id: skillId, parent_id: node.id, name: clean });
+      qc.setQueryData<TopicNode[]>(["topics", skillId], (current) =>
+        current ? insertChildTopic(current, node.id, created) : current,
+      );
+      setChildName("");
+      setAdding(false);
+      setOpen(true);
+      await refresh();
+    } catch (err) {
+      setChildError(err instanceof ApiError ? err.message : "Failed to add child topic.");
+    }
   }
 
   return (
@@ -129,6 +137,7 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
           <button type="submit" className="icon-btn plus" aria-label="Save child">
             +
           </button>
+          {childError && <span className="error" style={{ fontSize: "0.8rem", width: "100%" }}>{childError}</span>}
         </form>
       )}
       {showNotes && <NotesPanel topicId={node.id} topicName={node.name} />}

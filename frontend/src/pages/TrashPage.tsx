@@ -78,6 +78,7 @@ export default function TrashPage() {
       } else {
         await permanentlyDeleteGoal(pendingDelete.id);
         qc.invalidateQueries({ queryKey: ["goals-trash"] });
+        qc.invalidateQueries({ queryKey: ["goals"] });
       }
       setPendingDelete(null);
     } catch (e) {

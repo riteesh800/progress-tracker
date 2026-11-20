@@ -85,6 +85,8 @@ func openStagingPostgresTestEnv(t *testing.T) *TestEnv {
 	}
 	_, err = db.Exec(ctx, nil, `
 		TRUNCATE TABLE
+			goal_activities,
+			goals,
 			skill_timers,
 			password_reset_tokens,
 			refresh_tokens,
@@ -594,5 +596,55 @@ sys.stdout.buffer.write(f"{h.status_code}\n".encode("utf-8") + h.wfile.getvalue(
 	}, AuthHeader(tokenA))
 	if code != http.StatusCreated || aiConf["total_leaves"] != float64(2) {
 		t.Fatalf("PostgreSQL /ai/confirm-syllabus failed: %d %s", code, string(rawAIConf))
+	}
+
+	// 14. Goals Full Lifecycle & Isolation on PostgreSQL
+	futureDeadline := time.Now().Add(72 * time.Hour).Format(time.RFC3339)
+	code, goalA, rawGoalA := env.DoJSON(http.MethodPost, "/goals", map[string]any{
+		"goal_name":       "Master Distributed Storage on PostgreSQL",
+		"deadline_at":     futureDeadline,
+		"timezone":        "UTC",
+		"motivation_line": "Consistency beats intensity every day.",
+	}, AuthHeader(tokenA))
+	if code != http.StatusCreated {
+		t.Fatalf("PostgreSQL create goal failed: %d %s", code, string(rawGoalA))
+	}
+	goalAID, _ := goalA["id"].(string)
+
+	// Add Activity to Goal on PostgreSQL
+	code, actA, rawActA := env.DoJSON(http.MethodPost, "/goals/"+goalAID+"/activities", map[string]any{
+		"activity_text": "Read Chapter 4 on WAL and Checkpoints",
+	}, AuthHeader(tokenA))
+	if code != http.StatusCreated {
+		t.Fatalf("PostgreSQL add goal activity failed: %d %s", code, string(rawActA))
+	}
+	_ = actA
+
+	// Verify Goal Progress on PostgreSQL
+	code, progA, rawProgA := env.DoJSON(http.MethodGet, "/goals/"+goalAID+"/progress", nil, AuthHeader(tokenA))
+	if code != http.StatusOK {
+		t.Fatalf("PostgreSQL get goal progress failed: %d %s", code, string(rawProgA))
+	}
+	if currentScore, _ := progA["current_score"].(float64); currentScore != 1 {
+		t.Fatalf("expected current_score 1 on PostgreSQL, got %v", progA["current_score"])
+	}
+
+	// Move Goal to Trash on PostgreSQL
+	code, _, _ = env.DoJSON(http.MethodDelete, "/goals/"+goalAID, nil, AuthHeader(tokenA))
+	if code != http.StatusOK {
+		t.Fatalf("PostgreSQL delete goal to trash failed: %d", code)
+	}
+
+	// Restore Goal on PostgreSQL
+	code, _, _ = env.DoJSON(http.MethodPost, "/goals/"+goalAID+"/restore", nil, AuthHeader(tokenA))
+	if code != http.StatusOK {
+		t.Fatalf("PostgreSQL restore goal failed: %d", code)
+	}
+
+	// Permanent Delete on PostgreSQL
+	_, _, _ = env.DoJSON(http.MethodDelete, "/goals/"+goalAID, nil, AuthHeader(tokenA))
+	code, _, _ = env.DoJSON(http.MethodDelete, "/goals/"+goalAID+"/permanent", nil, AuthHeader(tokenA))
+	if code != http.StatusOK {
+		t.Fatalf("PostgreSQL permanent purge goal failed: %d", code)
 	}
 }

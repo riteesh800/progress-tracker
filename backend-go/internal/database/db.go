@@ -14,6 +14,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"skill-progress-tracker/backend-go/internal/config"
+	"skill-progress-tracker/backend-go/internal/core"
 )
 
 type Querier interface {
@@ -74,7 +75,11 @@ func Open(cfg *config.Settings) (*DB, error) {
 		sqlDB.SetConnMaxLifetime(300 * time.Second)
 	}
 
-	return &DB{SQL: sqlDB, Dialect: "postgres"}, nil
+	db := &DB{SQL: sqlDB, Dialect: "postgres"}
+	if err := db.InitPostgresSchema(context.Background()); err != nil {
+		core.Logger.Warn("PostgreSQL schema initialization check returned error", "error", err)
+	}
+	return db, nil
 }
 
 func sqliteDSN(raw string) string {
@@ -201,6 +206,182 @@ func IsUniqueViolation(err error) bool {
 		strings.Contains(msg, "duplicate key") ||
 		strings.Contains(msg, "23505") ||
 		strings.Contains(msg, "sqlite_constraint_unique")
+}
+
+// InitPostgresSchema ensures all tables and indexes exist when running on PostgreSQL (Supabase / staging).
+func (db *DB) InitPostgresSchema(ctx context.Context) error {
+	if !db.IsPostgres() {
+		return nil
+	}
+	ddl := []string{
+		`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`,
+		`CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			email VARCHAR(320) NOT NULL UNIQUE,
+			password_hash VARCHAR(255),
+			google_id VARCHAR(255) UNIQUE,
+			name VARCHAR(200) NOT NULL DEFAULT '',
+			timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+			is_active BOOLEAN NOT NULL DEFAULT TRUE,
+			must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+			deletion_requested_at TIMESTAMPTZ,
+			deletion_deadline TIMESTAMPTZ,
+			last_active_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_users_email ON users(email)`,
+		`CREATE TABLE IF NOT EXISTS skills (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name VARCHAR(200) NOT NULL,
+			description TEXT,
+			deleted_at TIMESTAMPTZ,
+			purge_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			CONSTRAINT uq_skills_user_name UNIQUE (user_id, name)
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_skills_user_id ON skills(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_skills_user_deleted ON skills(user_id, deleted_at)`,
+		`CREATE TABLE IF NOT EXISTS topics (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+			parent_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+			name VARCHAR(500) NOT NULL,
+			description TEXT,
+			order_index INTEGER NOT NULL DEFAULT 0,
+			is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+			completed_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_topics_skill_parent_order ON topics(skill_id, parent_id, order_index)`,
+		`CREATE INDEX IF NOT EXISTS ix_topics_parent_id ON topics(parent_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_topics_skill_id ON topics(skill_id)`,
+		`CREATE TABLE IF NOT EXISTS notes (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			topic_id UUID NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			content TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_notes_topic_id ON notes(topic_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_notes_user_id ON notes(user_id)`,
+		`CREATE TABLE IF NOT EXISTS activity_log (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			action_type VARCHAR(32) NOT NULL,
+			topic_id UUID REFERENCES topics(id) ON DELETE SET NULL,
+			skill_id UUID REFERENCES skills(id) ON DELETE SET NULL,
+			topic_name_snapshot TEXT,
+			skill_name_snapshot TEXT,
+			parent_name_snapshot TEXT,
+			summary TEXT,
+			occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			activity_date DATE NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_activity_user_date ON activity_log(user_id, activity_date)`,
+		`CREATE INDEX IF NOT EXISTS ix_activity_user_type_date ON activity_log(user_id, action_type, activity_date)`,
+		`CREATE INDEX IF NOT EXISTS ix_activity_user_occurred ON activity_log(user_id, occurred_at)`,
+		`CREATE TABLE IF NOT EXISTS personal_notes (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title VARCHAR(300) NOT NULL DEFAULT 'Untitled note',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_personal_notes_user_id ON personal_notes(user_id)`,
+		`CREATE TABLE IF NOT EXISTS personal_note_tasks (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			note_id UUID NOT NULL REFERENCES personal_notes(id) ON DELETE CASCADE,
+			content TEXT NOT NULL DEFAULT '',
+			is_completed BOOLEAN NOT NULL DEFAULT FALSE,
+			order_index INTEGER NOT NULL DEFAULT 0,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_personal_note_tasks_note_id ON personal_note_tasks(note_id)`,
+		`CREATE TABLE IF NOT EXISTS import_jobs (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			skill_id UUID REFERENCES skills(id) ON DELETE SET NULL,
+			original_filename VARCHAR(500) NOT NULL,
+			file_size_bytes INTEGER NOT NULL,
+			status VARCHAR(32) NOT NULL DEFAULT 'uploaded',
+			confidence_notes JSONB,
+			error_message TEXT,
+			generated_tree_json JSONB,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_import_jobs_user_id ON import_jobs(user_id)`,
+		`CREATE TABLE IF NOT EXISTS refresh_tokens (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token_hash VARCHAR(255) NOT NULL,
+			expires_at TIMESTAMPTZ NOT NULL,
+			revoked BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash ON refresh_tokens(token_hash)`,
+		`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			code_hash VARCHAR(255) NOT NULL,
+			expires_at TIMESTAMPTZ NOT NULL,
+			used BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_password_reset_tokens_user_id ON password_reset_tokens(user_id)`,
+		`CREATE TABLE IF NOT EXISTS skill_timers (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+			from_date DATE NOT NULL,
+			to_date DATE NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			CONSTRAINT uq_skill_timers_user_skill UNIQUE (user_id, skill_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_skill_timers_user_id ON skill_timers(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_skill_timers_skill_id ON skill_timers(skill_id)`,
+		`CREATE TABLE IF NOT EXISTS goals (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			goal_name VARCHAR(100) NOT NULL,
+			deadline_at TIMESTAMPTZ NOT NULL,
+			timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+			motivation_line VARCHAR(200),
+			deleted_at TIMESTAMPTZ,
+			purge_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_goals_user_id ON goals(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_goals_user_deleted ON goals(user_id, deleted_at)`,
+		`CREATE INDEX IF NOT EXISTS ix_goals_purge_at ON goals(purge_at)`,
+		`CREATE TABLE IF NOT EXISTS goal_activities (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			goal_id UUID NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+			user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			activity_text VARCHAR(50) NOT NULL,
+			activity_date DATE NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_goal_id ON goal_activities(goal_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_user_id ON goal_activities(user_id)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_goal_date ON goal_activities(goal_id, activity_date)`,
+		`CREATE INDEX IF NOT EXISTS ix_goal_activities_user_date ON goal_activities(user_id, activity_date)`,
+	}
+	for _, stmt := range ddl {
+		if _, err := db.SQL.ExecContext(ctx, stmt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // InitSQLiteSchema ensures all tables and columns exist when running on SQLite (local/test).

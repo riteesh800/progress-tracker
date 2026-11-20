@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { getSkill } from "../api/skills.api";
 import { createTopic, skillTopics } from "../api/topics.api";
+import { ApiError } from "../api/client";
 import Donut from "../components/ProgressVisuals";
 import TopicTree from "../components/TopicTree";
 import SkillTimerCard from "../components/SkillTimerCard";
@@ -13,6 +14,7 @@ export default function SkillDetailPage() {
   const skill = useQuery({ queryKey: ["skill", id], queryFn: () => getSkill(id!), enabled: Boolean(id) });
   const tree = useQuery({ queryKey: ["topics", id], queryFn: () => skillTopics(id!), enabled: Boolean(id) });
   const [rootName, setRootName] = useState("");
+  const [rootError, setRootError] = useState("");
 
   if (!skill.data && skill.isPending) return <p>Loading skill…</p>;
   if (!tree.data && tree.isPending) return <p>Loading skill…</p>;
@@ -22,16 +24,22 @@ export default function SkillDetailPage() {
 
   async function addRoot(e: FormEvent) {
     e.preventDefault();
-    if (!id || !rootName.trim()) return;
-    await createTopic({ skill_id: id, name: rootName.trim() });
-    setRootName("");
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ["topics", id] }),
-      qc.invalidateQueries({ queryKey: ["skill", id] }),
-      qc.invalidateQueries({ queryKey: ["dashboard"] }),
-      qc.invalidateQueries({ queryKey: ["skills"] }),
-      qc.invalidateQueries({ queryKey: ["activity"] }),
-    ]);
+    const clean = rootName.trim();
+    if (!id || !clean) return;
+    setRootError("");
+    try {
+      await createTopic({ skill_id: id, name: clean });
+      setRootName("");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["topics", id] }),
+        qc.invalidateQueries({ queryKey: ["skill", id] }),
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        qc.invalidateQueries({ queryKey: ["skills"] }),
+        qc.invalidateQueries({ queryKey: ["activity"] }),
+      ]);
+    } catch (err) {
+      setRootError(err instanceof ApiError ? err.message : "Failed to add topic.");
+    }
   }
 
   return (
@@ -54,6 +62,7 @@ export default function SkillDetailPage() {
         <input placeholder="Add root topic" value={rootName} onChange={(e) => setRootName(e.target.value)} />
         <button className="primary" type="submit">Add topic</button>
       </form>
+      {rootError && <p className="error">{rootError}</p>}
       <TopicTree nodes={nodes} skillId={id!} />
     </div>
   );
