@@ -413,44 +413,40 @@ export function ConsistencyGraph() {
               />
               <circle r="3.5" fill="#ffffff" />
             </g>
-
-            {/* Hover Crosshair & Focused Point */}
-            {activeHover && (
-              <g>
-                <line
-                  x1={activeHover.x}
-                  y1={PADDING.top}
-                  x2={activeHover.x}
-                  y2={baselineY}
-                  stroke="rgba(94, 234, 212, 0.45)"
-                  strokeWidth="1.2"
-                  strokeDasharray="3 3"
-                />
-                <circle
-                  cx={activeHover.x}
-                  cy={activeHover.y}
-                  r="6"
-                  fill={activeHover.type === "up" ? "#22c55e" : activeHover.type === "down" ? "#ef4444" : "#94a3b8"}
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  filter={`url(#glow-halo-${uid})`}
-                />
-              </g>
-            )}
           </g>
+
+          {/* Hover Crosshair & Focused Point (rendered outside clipPath so the dotted line connects directly to the hover box above) */}
+          {activeHover && (
+            <g>
+              <line
+                x1={activeHover.x}
+                y1={-10}
+                x2={activeHover.x}
+                y2={baselineY}
+                stroke="rgba(94, 234, 212, 0.55)"
+                strokeWidth="1.2"
+                strokeDasharray="3 3"
+              />
+              <circle
+                cx={activeHover.x}
+                cy={activeHover.y}
+                r="6"
+                fill={activeHover.type === "up" ? "#22c55e" : activeHover.type === "down" ? "#ef4444" : "#94a3b8"}
+                stroke="#ffffff"
+                strokeWidth="2"
+                filter={`url(#glow-halo-${uid})`}
+              />
+            </g>
+          )}
         </svg>
 
-        {/* Interactive Floating Tooltip (strictly bounded inside card) */}
+        {/* Interactive Floating Tooltip (positioned above the chart in the marked header area) */}
         {activeHover && (() => {
           const tipPct = (activeHover.x / SVG_WIDTH) * 100;
-          let tipPositionStyle: React.CSSProperties;
-          if (tipPct < 25) {
-            tipPositionStyle = { left: "14px", transform: "none" };
-          } else if (tipPct > 75) {
-            tipPositionStyle = { right: "14px", left: "auto", transform: "none" };
-          } else {
-            tipPositionStyle = { left: `${tipPct}%`, transform: "translateX(-50%)" };
-          }
+          const tipPositionStyle: React.CSSProperties = {
+            left: `clamp(115px, ${tipPct}%, calc(100% - 115px))`,
+            transform: "translateX(-50%)",
+          };
 
           return (
             <div className="dash-graph-tooltip" style={tipPositionStyle}>
