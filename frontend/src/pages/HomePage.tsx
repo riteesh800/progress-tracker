@@ -586,10 +586,10 @@ export default function HomePage() {
       title: "Account Consistency & Momentum",
       tagline: "Daily study consistency over the last year • Daily submissions push upward, missed days bring it down.",
       description:
-        "Witness your daily learning discipline compound over time. The Consistency & Momentum engine models your study trajectory across a 365-day rolling timeline: daily study submissions boost your score by +1.0, while missed days bring it down by -0.5, holding you accountable to long-term mastery.",
+        "Witness your daily learning discipline compound over time. The Consistency & Momentum engine models your study trajectory across a 365-day rolling timeline: daily study submissions boost your score by +1.0, while missed days bring it down by -1.0, holding you accountable to long-term mastery.",
       highlights: [
-        "Mathematical momentum scoring: +1.0 gain on daily submissions and -0.5 penalty on missed study days",
-        "Asymmetric recovery formula: requires double the active days to rebuild momentum lost to skipped sessions",
+        "Mathematical momentum scoring: +1.0 gain on daily submissions and -1.0 penalty on missed study days",
+        "Discipline balance formula: each missed day decreases momentum by 1.0, requiring active daily study to rebuild your score",
         "Live momentum analytics: real-time Momentum Score, Active Days ratio (e.g. 42 of 71), and all-time Peak records",
         "Interactive SVG visualization: glowing green push lines, red missed-day drops, and rolling 1-year timeline",
       ],
@@ -719,7 +719,7 @@ export default function HomePage() {
                   </span>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
                     <span style={{ width: "6.5px", height: "6.5px", borderRadius: "50%", background: "#ef4444", boxShadow: "0 0 5px #ef4444" }} />
-                    <span>Missed day (-0.5 Down)</span>
+                    <span>Missed day (-1.0 Down)</span>
                   </span>
                 </div>
                 <span style={{ color: "#64748b" }}>Showing last 1 year timeline (71 days tracked)</span>

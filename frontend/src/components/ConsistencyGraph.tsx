@@ -47,7 +47,7 @@ export function ConsistencyGraph() {
   // 2. Start from first active submission day
   // 3. Score calculation:
   //    - If count > 0: +1.0 (UP, light shining green)
-  //    - If count === 0: -0.5 (DOWN, thin shining red, clamped at 0)
+  //    - If count === 0: -1.0 (DOWN, thin shining red, clamped at 0)
   //    - 1 submission and 100 submissions are treated the same (+1.0)
   const processed = useMemo(() => {
     if (!q.data || !q.data.days || q.data.days.length === 0) {
@@ -95,8 +95,8 @@ export function ConsistencyGraph() {
         activeDaysCount++;
         type = "up";
       } else {
-        // Missed day: brings it down by -0.5 (double the down days of up to cancel)
-        currentScore = Math.max(0, currentScore - 0.5);
+        // Missed day: brings it down by -1.0
+        currentScore = Math.max(0, currentScore - 1.0);
         type = currentScore < prevScore ? "down" : "flat";
       }
 
@@ -459,7 +459,7 @@ export function ConsistencyGraph() {
                 )}
                 {activeHover.type === "down" && (
                   <span className="dash-graph-tip-badge down">
-                    ▼ -0.5 Missed day • No submissions
+                    ▼ -1.0 Missed day • No submissions
                   </span>
                 )}
                 {activeHover.type === "start" && (
@@ -484,7 +484,7 @@ export function ConsistencyGraph() {
             <span className="dash-graph-dot green" aria-hidden /> Daily submission (+1.0 Up)
           </span>
           <span className="dash-graph-legend-item">
-            <span className="dash-graph-dot red" aria-hidden /> Missed day (-0.5 Down)
+            <span className="dash-graph-dot red" aria-hidden /> Missed day (-1.0 Down)
           </span>
         </div>
         <span className="muted dash-graph-meta">
