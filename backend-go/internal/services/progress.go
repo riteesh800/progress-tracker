@@ -43,6 +43,7 @@ type ProgressEngine struct {
 	Topics       map[uuid.UUID]models.Topic
 	Children     map[uuid.UUID][]models.Topic
 	RootChildren []models.Topic
+	NoteTopicIDs map[uuid.UUID]bool
 	countsCache  map[uuid.UUID]leafCountPair
 	leavesCache  map[uuid.UUID][]models.Topic
 }
@@ -219,6 +220,7 @@ func (e *ProgressEngine) BuildNode(topic models.Topic, seen map[uuid.UUID]bool) 
 	if prog.IsLeaf {
 		isCompleted = topic.IsCompleted
 	}
+	hasNotes := e.NoteTopicIDs != nil && e.NoteTopicIDs[topic.ID]
 	if seen[topic.ID] {
 		return models.TopicNodeOut{
 			ID:              topic.ID,
@@ -232,6 +234,7 @@ func (e *ProgressEngine) BuildNode(topic models.Topic, seen map[uuid.UUID]bool) 
 			CompletedLeaves: prog.CompletedLeaves,
 			TotalLeaves:     prog.TotalLeaves,
 			Percent:         prog.Percent,
+			HasNotes:        hasNotes,
 			Children:        []models.TopicNodeOut{},
 		}
 	}
@@ -253,6 +256,7 @@ func (e *ProgressEngine) BuildNode(topic models.Topic, seen map[uuid.UUID]bool) 
 		CompletedLeaves: prog.CompletedLeaves,
 		TotalLeaves:     prog.TotalLeaves,
 		Percent:         prog.Percent,
+		HasNotes:        hasNotes,
 		Children:        kids,
 	}
 }
@@ -503,7 +507,12 @@ func ComputeSkillProgress(topics []models.Topic) (int, int, float64, bool) {
 }
 
 func BuildTopicTree(topics []models.Topic) []models.TopicNodeOut {
+	return BuildTopicTreeWithNotes(topics, nil)
+}
+
+func BuildTopicTreeWithNotes(topics []models.Topic, noteTopicIDs map[uuid.UUID]bool) []models.TopicNodeOut {
 	engine := NewProgressEngine(topics)
+	engine.NoteTopicIDs = noteTopicIDs
 	return engine.BuildTree()
 }
 

@@ -221,7 +221,20 @@ func (s *Server) GetSkillTree(w http.ResponseWriter, r *http.Request, user *mode
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
-	tree := services.BuildTopicTree(topics)
+	noteTopicIDs := make(map[uuid.UUID]bool)
+	nRows, nErr := s.DB.Query(ctx, nil, `SELECT DISTINCT topic_id FROM notes WHERE user_id = ?`, s.DB.FormatUUID(user.ID))
+	if nErr == nil {
+		defer nRows.Close()
+		for nRows.Next() {
+			var rawTID any
+			if err := nRows.Scan(&rawTID); err == nil {
+				if tid, err := database.ParseUUID(rawTID); err == nil {
+					noteTopicIDs[tid] = true
+				}
+			}
+		}
+	}
+	tree := services.BuildTopicTreeWithNotes(topics, noteTopicIDs)
 	if tree == nil {
 		tree = []models.TopicNodeOut{}
 	}

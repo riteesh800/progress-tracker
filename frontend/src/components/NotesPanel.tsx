@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createNote, deleteNote, listNotes } from "../api/notes.api";
 import { ApiError } from "../api/client";
 
-export default function NotesPanel({ topicId, topicName }: { topicId: string; topicName: string }) {
+export default function NotesPanel({ topicId, topicName, skillId }: { topicId: string; topicName: string; skillId?: string }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["notes", topicId], queryFn: () => listNotes(topicId) });
   const [content, setContent] = useState("");
@@ -14,6 +14,7 @@ export default function NotesPanel({ topicId, topicName }: { topicId: string; to
       setContent("");
       setError("");
       qc.invalidateQueries({ queryKey: ["notes", topicId] });
+      if (skillId) qc.invalidateQueries({ queryKey: ["topics", skillId] });
       qc.invalidateQueries({ queryKey: ["activity"] });
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : "Could not save note"),
@@ -36,7 +37,16 @@ export default function NotesPanel({ topicId, topicName }: { topicId: string; to
       {q.data?.map((n) => (
         <div key={n.id} className="row" style={{ marginBottom: 6 }}>
           <pre style={{ whiteSpace: "pre-wrap", flex: 1, margin: 0 }}>{n.content}</pre>
-          <button className="danger" onClick={() => deleteNote(n.id).then(() => { qc.invalidateQueries({ queryKey: ["notes", topicId] }); qc.invalidateQueries({ queryKey: ["activity"] }); })}>
+          <button
+            className="danger"
+            onClick={() =>
+              deleteNote(n.id).then(() => {
+                qc.invalidateQueries({ queryKey: ["notes", topicId] });
+                if (skillId) qc.invalidateQueries({ queryKey: ["topics", skillId] });
+                qc.invalidateQueries({ queryKey: ["activity"] });
+              })
+            }
+          >
             Delete
           </button>
         </div>

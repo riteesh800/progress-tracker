@@ -12,6 +12,7 @@ export type TopicNode = {
   completed_leaves: number;
   total_leaves: number;
   percent: number;
+  has_notes?: boolean;
   children: TopicNode[];
 };
 

@@ -53,6 +53,19 @@ func TestTopicNotesPersonalNotesSearchAndDashboard(t *testing.T) {
 		t.Fatalf("User B GET User A note expected 404, got %d", code)
 	}
 
+	// Verify User A's skill tree immediately marks has_notes = true
+	code, _, rawTree := env.DoJSON(http.MethodGet, "/skills/"+skillID+"/topics", nil, AuthHeader(tokenA))
+	if code != http.StatusOK {
+		t.Fatalf("failed to fetch tree nodes: code=%d", code)
+	}
+	var treeNodes []map[string]any
+	if err := json.Unmarshal(rawTree, &treeNodes); err != nil || len(treeNodes) == 0 {
+		t.Fatalf("failed to parse tree nodes: %v, raw=%s", err, string(rawTree))
+	}
+	if hasNotes, ok := treeNodes[0]["has_notes"].(bool); !ok || !hasNotes {
+		t.Fatalf("expected topic node has_notes == true, got %v", treeNodes[0]["has_notes"])
+	}
+
 	// Personal Notes & Tasks checklist
 	code, pNote, _ := env.DoJSON(http.MethodPost, "/personal-notes", map[string]any{
 		"title": "Weekend Study Plan",

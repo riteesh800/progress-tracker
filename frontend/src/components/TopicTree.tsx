@@ -43,8 +43,8 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
   const [childError, setChildError] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const isLeaf = isLeafNode(node);
-  const notesQuery = useQuery({ queryKey: ["notes", node.id], queryFn: () => listNotes(node.id) });
-  const hasNotes = (notesQuery.data?.length ?? 0) > 0;
+  const notesQuery = useQuery({ queryKey: ["notes", node.id], queryFn: () => listNotes(node.id), enabled: showNotes });
+  const hasNotes = notesQuery.data !== undefined ? notesQuery.data.length > 0 : Boolean(node.has_notes);
 
   const refresh = async () => {
     await Promise.all([
@@ -140,7 +140,7 @@ function TopicItem({ node, skillId }: { node: TopicNode; skillId: string }) {
           {childError && <span className="error" style={{ fontSize: "0.8rem", width: "100%" }}>{childError}</span>}
         </form>
       )}
-      {showNotes && <NotesPanel topicId={node.id} topicName={node.name} />}
+      {showNotes && <NotesPanel topicId={node.id} topicName={node.name} skillId={skillId} />}
       {open && !isLeaf && <TopicTree nodes={node.children} skillId={skillId} />}
     </div>
   );

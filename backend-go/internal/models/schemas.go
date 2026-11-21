@@ -368,6 +368,7 @@ type TopicNodeOut struct {
 	CompletedLeaves int            `json:"completed_leaves"`
 	TotalLeaves     int            `json:"total_leaves"`
 	Percent         float64        `json:"percent"`
+	HasNotes        bool           `json:"has_notes"`
 	Children        []TopicNodeOut `json:"children"`
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"skill-progress-tracker/backend-go/internal/core"
+	"skill-progress-tracker/backend-go/internal/database"
 	"skill-progress-tracker/backend-go/internal/models"
 	"skill-progress-tracker/backend-go/internal/services"
 )
@@ -145,7 +146,20 @@ func (s *Server) GetTopic(w http.ResponseWriter, r *http.Request, user *models.U
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
+	noteTopicIDs := make(map[uuid.UUID]bool)
+	if nRows, nErr := s.DB.Query(ctx, nil, `SELECT DISTINCT topic_id FROM notes WHERE user_id = ?`, s.DB.FormatUUID(user.ID)); nErr == nil {
+		defer nRows.Close()
+		for nRows.Next() {
+			var rawTID any
+			if err := nRows.Scan(&rawTID); err == nil {
+				if tid, err := database.ParseUUID(rawTID); err == nil {
+					noteTopicIDs[tid] = true
+				}
+			}
+		}
+	}
 	engine := services.NewProgressEngine(topics)
+	engine.NoteTopicIDs = noteTopicIDs
 	node := engine.BuildNode(*topic, nil)
 	core.WriteJSON(w, http.StatusOK, node)
 }
@@ -166,7 +180,20 @@ func (s *Server) TopicChildren(w http.ResponseWriter, r *http.Request, user *mod
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
+	noteTopicIDs := make(map[uuid.UUID]bool)
+	if nRows, nErr := s.DB.Query(ctx, nil, `SELECT DISTINCT topic_id FROM notes WHERE user_id = ?`, s.DB.FormatUUID(user.ID)); nErr == nil {
+		defer nRows.Close()
+		for nRows.Next() {
+			var rawTID any
+			if err := nRows.Scan(&rawTID); err == nil {
+				if tid, err := database.ParseUUID(rawTID); err == nil {
+					noteTopicIDs[tid] = true
+				}
+			}
+		}
+	}
 	engine := services.NewProgressEngine(topics)
+	engine.NoteTopicIDs = noteTopicIDs
 	children := engine.Children[topic.ID]
 	out := make([]models.TopicNodeOut, 0, len(children))
 	for _, c := range children {
@@ -195,7 +222,20 @@ func (s *Server) CompleteTopic(w http.ResponseWriter, r *http.Request, user *mod
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
+	noteTopicIDs := make(map[uuid.UUID]bool)
+	if nRows, nErr := s.DB.Query(ctx, nil, `SELECT DISTINCT topic_id FROM notes WHERE user_id = ?`, s.DB.FormatUUID(user.ID)); nErr == nil {
+		defer nRows.Close()
+		for nRows.Next() {
+			var rawTID any
+			if err := nRows.Scan(&rawTID); err == nil {
+				if tid, err := database.ParseUUID(rawTID); err == nil {
+					noteTopicIDs[tid] = true
+				}
+			}
+		}
+	}
 	engine := services.NewProgressEngine(topics)
+	engine.NoteTopicIDs = noteTopicIDs
 	if !engine.IsLeaf(topic.ID) {
 		core.WriteError(w, http.StatusUnprocessableEntity, "not_a_leaf", "Only leaf topics can be marked complete.")
 		return
@@ -228,6 +268,7 @@ func (s *Server) CompleteTopic(w http.ResponseWriter, r *http.Request, user *mod
 		}
 	}
 	engineAfter := services.NewProgressEngine(topics)
+	engineAfter.NoteTopicIDs = noteTopicIDs
 	compLeaves, totalLeaves, _ := engineAfter.SkillProgress()
 
 	err = s.DB.WithTx(ctx, func(tx *sql.Tx) error {
