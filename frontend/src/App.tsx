@@ -73,18 +73,41 @@ function Shell({ children }: { children: ReactNode }) {
       </button>
       {open && <button type="button" className="nav-backdrop" aria-label="Close menu" onClick={() => setOpen(false)} />}
       <aside className="sidebar">
-        <NavLink className="brand" to="/dashboard" onClick={() => setOpen(false)}>
+        <NavLink
+          className="brand"
+          to="/dashboard"
+          onClick={() => {
+            setOpen(false);
+            qc.invalidateQueries();
+          }}
+        >
           Progress Tracker
         </NavLink>
         <nav className="nav">
           {links.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className="nav-item" onClick={() => setOpen(false)}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className="nav-item"
+              onClick={() => {
+                setOpen(false);
+                qc.invalidateQueries();
+              }}
+            >
               <Icon d={item.d} />
               <span>{item.label}</span>
             </NavLink>
           ))}
           {isAdmin && (
-            <NavLink to="/admin" className="nav-item" onClick={() => setOpen(false)}>
+            <NavLink
+              to="/admin"
+              className="nav-item"
+              onClick={() => {
+                setOpen(false);
+                qc.invalidateQueries();
+              }}
+            >
               <Icon d="M12 3 5 6.5v5c0 4.2 2.7 8 7 9 4.3-1 7-4.8 7-9v-5L12 3Zm0 6v4m0 3h.01" />
               <span>Admin</span>
             </NavLink>

@@ -8,7 +8,6 @@ export default function SkillTimerCard({ skillId }: { skillId: string }) {
   const { data: timer, isPending } = useQuery({
     queryKey,
     queryFn: () => getSkillTimer(skillId),
-    staleTime: 5 * 60 * 1000,
   });
 
   const [from, setFrom] = useState("");

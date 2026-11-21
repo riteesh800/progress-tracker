@@ -14,7 +14,8 @@ const client = new QueryClient({
         return count < 2;
       },
       refetchOnWindowFocus: false,
-      staleTime: 30_000,
+      refetchOnMount: "always",
+      staleTime: 0,
     },
     mutations: {
       retry: false,
