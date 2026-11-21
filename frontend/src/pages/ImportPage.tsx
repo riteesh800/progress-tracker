@@ -216,6 +216,8 @@ export default function ImportPage() {
   const [statusMsg, setStatusMsg] = useState("");
   const [skillName, setSkillName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -226,6 +228,10 @@ export default function ImportPage() {
         const j = await getJob(jobId!);
         if (stop) return;
         setJob(j);
+        if (j.status === "confirmed" && j.skill_id) {
+          nav(`/skills/${j.skill_id}`);
+          return;
+        }
         if (j.status === "extracting") setStatusMsg("Extracting text…");
         else if (j.status === "parsing" || j.status === "uploaded") setStatusMsg("Parsing PDF… Analyzing structure…");
         else setStatusMsg("");
@@ -271,18 +277,29 @@ export default function ImportPage() {
   }
 
   async function confirm() {
-    if (!jobId) return;
+    if (!jobId || confirming) return;
     setError("");
+    setConfirming(true);
     try {
-      if (job?.generated_tree_json) {
-        await patchTree(jobId, job.generated_tree_json);
+      if (job?.generated_tree_json && job.status === "ready_for_preview") {
+        await patchTree(jobId, job.generated_tree_json).catch(() => {});
       }
       const done = await confirmJob(jobId, skillName || undefined);
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      if (done.skill_id) nav(`/skills/${done.skill_id}`);
+      if (done.skill_id) {
+        nav(`/skills/${done.skill_id}`);
+      } else {
+        setError("Import confirmed, but skill could not be loaded.");
+      }
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not confirm import");
+      const msg = e instanceof ApiError ? e.message : "Could not confirm import";
+      setError(msg);
+      if (msg.toLowerCase().includes("skill with this name")) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } finally {
+      setConfirming(false);
     }
   }
 
@@ -327,9 +344,52 @@ export default function ImportPage() {
                 node={tree}
                 onChange={(n) => setJob({ ...job, generated_tree_json: n })}
               />
-              <div className="row" ref={bottomRef}>
-                <button onClick={() => void saveTree().catch(() => {})}>Save edits</button>
-                <button className="primary" onClick={confirm}>Confirm import</button>
+              <div className="import-action-bar" ref={bottomRef}>
+                {error && (
+                  <div className="import-error-banner" role="alert">
+                    <span>⚠️ {error}</span>
+                  </div>
+                )}
+                <div className="row">
+                  <button
+                    type="button"
+                    disabled={confirming || saving}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        await saveTree();
+                      } catch {
+                        // error handled in saveTree
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    {saving ? (
+                      <span className="btn-loading-content">
+                        <span className="btn-spinner" aria-hidden="true" />
+                        <span>Saving…</span>
+                      </span>
+                    ) : (
+                      "Save edits"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={confirm}
+                    disabled={confirming || saving}
+                  >
+                    {confirming ? (
+                      <span className="btn-loading-content">
+                        <span className="btn-spinner" aria-hidden="true" />
+                        <span>Importing…</span>
+                      </span>
+                    ) : (
+                      "Confirm import"
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}

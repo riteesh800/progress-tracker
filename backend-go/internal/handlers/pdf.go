@@ -600,6 +600,10 @@ func (s *Server) ConfirmJob(w http.ResponseWriter, r *http.Request, user *models
 		core.WriteAppError(w, appErr)
 		return
 	}
+	if job.Status == models.StatusConfirmed && job.SkillID != nil {
+		core.WriteJSON(w, http.StatusOK, serializeImportJob(job))
+		return
+	}
 	if job.Status != models.StatusReadyForPreview {
 		core.WriteError(w, http.StatusConflict, "not_ready", "Import is not ready to confirm.")
 		return
@@ -631,9 +635,13 @@ func (s *Server) ConfirmJob(w http.ResponseWriter, r *http.Request, user *models
 		stem = "Imported skill"
 	}
 	skillName := ""
+	isCustomName := false
 	if body.SkillName != nil && strings.TrimSpace(*body.SkillName) != "" {
 		skillName = strings.TrimSpace(*body.SkillName)
-	} else if tName, ok := tree["name"].(string); ok && strings.TrimSpace(tName) != "" {
+		isCustomName = true
+	} else if stem != "Imported skill" && stem != "" {
+		skillName = stem
+	} else if tName, ok := tree["name"].(string); ok && strings.TrimSpace(tName) != "" && strings.TrimSpace(tName) != "Imported syllabus" {
 		skillName = strings.TrimSpace(tName)
 	} else {
 		skillName = stem
@@ -648,8 +656,27 @@ func (s *Server) ConfirmJob(w http.ResponseWriter, r *http.Request, user *models
 		`SELECT id FROM skills WHERE user_id = ? AND name = ?`,
 		s.DB.FormatUUID(user.ID), skillName,
 	).Scan(&existingID)
+
+	if err == nil && !isCustomName {
+		// Default name already exists — automatically make it unique so default import never fails
+		baseName := skillName
+		for i := 2; i <= 1000; i++ {
+			candidate := fmt.Sprintf("%s (%d)", baseName, i)
+			if len([]rune(candidate)) > 200 {
+				candidate = fmt.Sprintf("%.190s (%d)", baseName, i)
+			}
+			var dummy string
+			checkErr := s.DB.QueryRow(ctx, nil, `SELECT id FROM skills WHERE user_id = ? AND name = ?`, s.DB.FormatUUID(user.ID), candidate).Scan(&dummy)
+			if checkErr != nil {
+				skillName = candidate
+				err = checkErr
+				break
+			}
+		}
+	}
+
 	if err == nil {
-		core.WriteError(w, http.StatusConflict, "skill_exists", "You already have a skill with this name.")
+		core.WriteError(w, http.StatusConflict, "skill_exists", "You already have a skill with this name. Please enter a different skill name.")
 		return
 	}
 
