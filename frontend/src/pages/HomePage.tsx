@@ -31,7 +31,7 @@ export default function HomePage() {
       title: "Automated AI Syllabus Generator",
       tagline: "Turn any subject into an exhaustive, structured learning roadmap in seconds.",
       description:
-        "Powered by Google Gemini AI, generate complete hierarchical course curricula instantly. Tailor depth across 4 distinct tiers and calibrate topics precisely according to your specific learning purpose.",
+        "Powered by advanced AI models, generate complete hierarchical course curricula instantly. Tailor depth across 4 distinct tiers and calibrate topics precisely according to your specific learning purpose.",
       highlights: [
         "4 Granular Depth Levels: Easy (Beginner), Medium (Core), Hard (In-Depth), and Comprehensive (A-to-Z)",
         "3 Purpose-Driven Modes: Technical Interview Prep, Quiz/Exam Revision, and A-to-Z Deep Mastery",
@@ -45,7 +45,7 @@ export default function HomePage() {
           <div className="mockup-ai-gen">
             <div className="mockup-input-box">
               <span>Python & Backend Architecture</span>
-              <span style={{ color: "#5eead4", fontSize: "0.75rem", fontWeight: 600 }}>Gemini 2.5</span>
+              <span style={{ color: "#5eead4", fontSize: "0.75rem", fontWeight: 600 }}>AI Engine</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
               <span className="muted" style={{ fontSize: "0.75rem" }}>Depth Tier:</span>
@@ -79,7 +79,7 @@ export default function HomePage() {
       title: "Interactive Syllabus Studio & AI Chat Refinement",
       tagline: "Inspect, prune, edit, and conversationally refine your syllabus before saving.",
       description:
-        "Never get locked into a static syllabus. The AI Preview Studio lets you inspect proposed hierarchies, chat directly with Gemini to add or remove concepts, accept or discard proposals, and undo changes with ease.",
+        "Never get locked into a static syllabus. The AI Preview Studio lets you inspect proposed hierarchies, chat directly with the AI to add or remove concepts, accept or discard proposals, and undo changes with ease.",
       highlights: [
         "Conversational AI Chat Refinement: type prompts like 'Add Docker and Kubernetes' or 'Focus on Async IO'",
         "Two-stage candidate validation: review proposed tree changes and click 'Accept' or 'Discard'",
@@ -348,10 +348,10 @@ export default function HomePage() {
       id: "consistency-heatmap",
       pill: "Consistency Heatmap",
       category: "Habit Building",
-      title: "GitHub-Style Consistency Heatmap & Streak Calendar",
+      title: "Interactive Consistency Heatmap & Streak Calendar",
       tagline: "Build unbreakable daily study habits with an interactive contribution matrix.",
       description:
-        "Witness your daily discipline compound over time. Inspired by GitHub's contribution matrix, the streak calendar visualizes every study action across weeks and months with 4-level color intensity.",
+        "Witness your daily discipline compound over time. Built with an interactive contribution matrix, the streak calendar visualizes every study action across weeks and months with 4-level color intensity.",
       highlights: [
         "12-month rolling contribution matrix with 4 distinct activity intensity levels",
         "Dynamic hover tooltips showing exact calendar dates and completed action counts",
@@ -765,6 +765,363 @@ export default function HomePage() {
         </div>
       ),
     },
+    {
+      id: "goal-tracking",
+      pill: "Goal",
+      category: "Target & Accountability",
+      title: "Target Goals & Live Countdown Engine",
+      tagline: "Set ambitious target dates, race against the live clock, and build daily consistency.",
+      description:
+        "Transform high-stakes aspirations into disciplined daily execution. Set target deadlines with motivational mantras, watch an animated live analog clock and ticking digital countdown race down to zero, record daily 50-character action cards, and maintain positive momentum scoring before your deadline arrives.",
+      highlights: [
+        "Real-time live clock & countdown: animated rotating analog clock hands paired with digital badges (years, months, days, hours, mins, secs) counting down to your deadline",
+        "'What I Did Today' action logging: record daily accomplishments constrained to 50 characters, arranged in a responsive 7-card weekly grid",
+        "Mathematical momentum scoring: earn +1.0 point per active study day, suffer -1.0 penalty per missed day with an interactive SVG trajectory graph",
+        "Inactivity warnings & completion audit: real-time accountability chips ('You did nothing from X days') and final achievement trophy summaries",
+      ],
+      ctaLabel: "Set a Target Goal",
+      ctaLink: isAuthenticated ? "/goals" : "/login?mode=register",
+      renderVisual: () => (
+        <div className="home-mockup-wrap">
+          <div
+            style={{
+              background: "#101722",
+              border: "1px solid #233345",
+              borderRadius: "10px",
+              padding: "0.85rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.6rem",
+              width: "100%",
+              boxSizing: "border-box",
+            }}
+          >
+            {/* Header: Goal Name + Status Badge */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+              <div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span>🎯</span>
+                  <span>Master Cloud Architecture &amp; Go</span>
+                </div>
+                <div
+                  style={{
+                    fontSize: "0.72rem",
+                    fontStyle: "italic",
+                    color: "#93c5fd",
+                    borderLeft: "2px solid #5eead4",
+                    paddingLeft: "0.45rem",
+                    marginTop: "0.25rem",
+                  }}
+                >
+                  &ldquo;Consistency beats intensity every single day.&rdquo;
+                </div>
+              </div>
+              <span
+                style={{
+                  background: "rgba(56, 189, 248, 0.15)",
+                  color: "#38bdf8",
+                  border: "1px solid rgba(56, 189, 248, 0.35)",
+                  borderRadius: "999px",
+                  fontSize: "0.68rem",
+                  fontWeight: 600,
+                  padding: "0.15rem 0.5rem",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ⏳ Active
+              </span>
+            </div>
+
+            {/* Live Working Clock & Embedded Countdown Centerpiece */}
+            <div
+              style={{
+                background: "radial-gradient(ellipse at 50% 30%, #152233 0%, #0d1520 70%, #090e17 100%)",
+                border: "1px solid #1e2c3d",
+                borderRadius: "8px",
+                padding: "0.65rem 0.8rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "0.5rem",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "#5eead4",
+                }}
+              >
+                Time is running, are you?
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.9rem" }}>
+                {/* Mini Analog Clock Face */}
+                <div
+                  style={{
+                    position: "relative",
+                    width: "52px",
+                    height: "52px",
+                    borderRadius: "50%",
+                    background: "#111823",
+                    border: "2px solid #2d3f53",
+                    boxShadow: "0 0 12px rgba(56, 189, 248, 0.25)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {/* Center Metallic Pivot */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      width: "6px",
+                      height: "6px",
+                      background: "#ffffff",
+                      borderRadius: "50%",
+                      transform: "translate(-50%, -50%)",
+                      zIndex: 4,
+                      boxShadow: "0 0 4px #ffffff",
+                    }}
+                  />
+                  {/* Hour Hand */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      width: "2.5px",
+                      height: "14px",
+                      background: "#38bdf8",
+                      transformOrigin: "50% 100%",
+                      transform: "translate(-50%, -100%) rotate(68deg)",
+                      borderRadius: "2px",
+                      zIndex: 2,
+                    }}
+                  />
+                  {/* Minute Hand */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      width: "2px",
+                      height: "19px",
+                      background: "#5eead4",
+                      transformOrigin: "50% 100%",
+                      transform: "translate(-50%, -100%) rotate(194deg)",
+                      borderRadius: "2px",
+                      zIndex: 2,
+                    }}
+                  />
+                  {/* Second Hand (Red Glowing) */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      width: "1.2px",
+                      height: "22px",
+                      background: "#ef4444",
+                      transformOrigin: "50% 100%",
+                      transform: "translate(-50%, -100%) rotate(320deg)",
+                      borderRadius: "1px",
+                      zIndex: 3,
+                      boxShadow: "0 0 6px #ef4444",
+                    }}
+                  />
+                </div>
+
+                {/* Digital Countdown Unit Badges */}
+                <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+                  <div
+                    style={{
+                      background: "#141e2b",
+                      border: "1px solid #2d3f53",
+                      borderRadius: "6px",
+                      padding: "0.22rem 0.4rem",
+                      minWidth: "32px",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff" }}>41</span>
+                    <span style={{ fontSize: "0.62rem", color: "#5eead4", marginLeft: "1px" }}>d</span>
+                  </div>
+                  <span style={{ color: "#475569", fontWeight: 700, fontSize: "0.75rem" }}>:</span>
+                  <div
+                    style={{
+                      background: "#141e2b",
+                      border: "1px solid #2d3f53",
+                      borderRadius: "6px",
+                      padding: "0.22rem 0.4rem",
+                      minWidth: "32px",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff" }}>18</span>
+                    <span style={{ fontSize: "0.62rem", color: "#5eead4", marginLeft: "1px" }}>h</span>
+                  </div>
+                  <span style={{ color: "#475569", fontWeight: 700, fontSize: "0.75rem" }}>:</span>
+                  <div
+                    style={{
+                      background: "#141e2b",
+                      border: "1px solid #2d3f53",
+                      borderRadius: "6px",
+                      padding: "0.22rem 0.4rem",
+                      minWidth: "32px",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff" }}>32</span>
+                    <span style={{ fontSize: "0.62rem", color: "#5eead4", marginLeft: "1px" }}>m</span>
+                  </div>
+                  <span style={{ color: "#475569", fontWeight: 700, fontSize: "0.75rem" }}>:</span>
+                  <div
+                    style={{
+                      background: "#141e2b",
+                      border: "1px solid #ef4444",
+                      borderRadius: "6px",
+                      padding: "0.22rem 0.4rem",
+                      minWidth: "32px",
+                      boxShadow: "0 0 8px rgba(239, 68, 68, 0.45)",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#fca5a5" }}>45</span>
+                    <span style={{ fontSize: "0.62rem", color: "#ef4444", marginLeft: "1px" }}>s</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Target Date Pill */}
+              <div
+                style={{
+                  fontSize: "0.68rem",
+                  color: "#38bdf8",
+                  background: "rgba(56, 189, 248, 0.1)",
+                  border: "1px solid rgba(56, 189, 248, 0.25)",
+                  borderRadius: "999px",
+                  padding: "0.15rem 0.65rem",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                }}
+              >
+                <span>⏳</span>
+                <span>Target: Dec 31, 2026 • 11:59 PM</span>
+              </div>
+            </div>
+
+            {/* What I Did Today Section */}
+            <div
+              style={{
+                background: "#121922",
+                border: "1px solid #202c3a",
+                borderRadius: "8px",
+                padding: "0.55rem 0.75rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.4rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.74rem", fontWeight: 600, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                  <span>📝</span>
+                  <span>What I Did Today</span>
+                </span>
+                <span style={{ fontSize: "0.68rem", color: "#4ade80", display: "flex", alignItems: "center", gap: "3px" }}>
+                  <span>✨</span>
+                  <span>On track • Active</span>
+                </span>
+              </div>
+
+              {/* Activity Cards List */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <div
+                  style={{
+                    background: "#182230",
+                    border: "1px solid #27374a",
+                    borderRadius: "6px",
+                    padding: "0.35rem 0.55rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontSize: "0.74rem", color: "#e2e8f0" }}>Built Raft consensus leader election ⚡</span>
+                  <span
+                    style={{
+                      fontSize: "0.64rem",
+                      color: "#5eead4",
+                      background: "rgba(94, 234, 212, 0.12)",
+                      border: "1px solid rgba(94, 234, 212, 0.3)",
+                      padding: "0.1rem 0.35rem",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    Today
+                  </span>
+                </div>
+                <div
+                  style={{
+                    background: "#182230",
+                    border: "1px solid #27374a",
+                    borderRadius: "6px",
+                    padding: "0.35rem 0.55rem",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={{ fontSize: "0.74rem", color: "#cbd5e1" }}>Benchmarked gRPC streaming throughput 🚀</span>
+                  <span
+                    style={{
+                      fontSize: "0.64rem",
+                      color: "#94a3b8",
+                      background: "#1e293b",
+                      padding: "0.1rem 0.35rem",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    Yesterday
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Consistency Momentum Bar */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontSize: "0.68rem",
+                color: "#93a4b5",
+                padding: "0 0.15rem",
+                flexWrap: "wrap",
+                gap: "0.3rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span
+                  style={{
+                    background: "rgba(34, 197, 94, 0.12)",
+                    border: "1px solid rgba(34, 197, 94, 0.4)",
+                    color: "#4ade80",
+                    borderRadius: "999px",
+                    padding: "0.1rem 0.45rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  +8.0 Score
+                </span>
+                <span>8 Worked Days</span>
+              </div>
+              <span style={{ color: "#64748b" }}>0 Missed Days • Peak 8.0</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
   ];
 
   const totalFeatures = features.length;
@@ -798,6 +1155,14 @@ export default function HomePage() {
     }, 6500);
     return () => clearInterval(timer);
   }, [isAutoPlay, isHovered, nextSlide]);
+
+  // Keep active pill scrolled into view smoothly
+  useEffect(() => {
+    const activePill = document.querySelector(".home-pill-btn.active");
+    if (activePill) {
+      activePill.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+  }, [activeIdx]);
 
 
   return (
@@ -881,7 +1246,7 @@ export default function HomePage() {
             </svg>
           </button>
 
-          {/* Track containing all 16 stacked feature cards so all cards stay equal size and arrows never jump */}
+          {/* Track containing all 17 stacked feature cards so all cards stay equal size and arrows never jump */}
           <div className="home-carousel-track">
             {features.map((feat, idx) => {
               const isActive = idx === activeIdx;

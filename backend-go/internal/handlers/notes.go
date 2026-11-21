@@ -222,7 +222,7 @@ func (s *Server) DeleteNote(w http.ResponseWriter, r *http.Request, user *models
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
-	_, err = s.DB.Exec(ctx, nil, `DELETE FROM notes WHERE id = ?`, s.DB.FormatUUID(note.ID))
+	_, err = s.DB.Exec(ctx, nil, `DELETE FROM notes WHERE id = ? AND user_id = ?`, s.DB.FormatUUID(note.ID), s.DB.FormatUUID(user.ID))
 	if err != nil {
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return

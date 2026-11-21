@@ -335,7 +335,11 @@ func (s *Server) DeletePersonalNote(w http.ResponseWriter, r *http.Request, user
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
-	_, err = s.DB.Exec(ctx, nil, `DELETE FROM personal_notes WHERE id = ?`, s.DB.FormatUUID(noteID))
+	err = s.DB.WithTx(ctx, func(tx *sql.Tx) error {
+		_, _ = s.DB.Exec(ctx, tx, `DELETE FROM personal_note_tasks WHERE note_id = ?`, s.DB.FormatUUID(noteID))
+		_, err := s.DB.Exec(ctx, tx, `DELETE FROM personal_notes WHERE id = ? AND user_id = ?`, s.DB.FormatUUID(noteID), s.DB.FormatUUID(user.ID))
+		return err
+	})
 	if err != nil {
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return

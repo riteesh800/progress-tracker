@@ -270,12 +270,20 @@ func (s *Server) AdminResetUserPassword(w http.ResponseWriter, r *http.Request, 
 }
 
 func (s *Server) CleanupExpiredAccounts(w http.ResponseWriter, r *http.Request, _ *models.User) {
-	count, err := s.runAccountCleanup(r.Context())
+	ctx := r.Context()
+	count, err := s.runAccountCleanup(ctx)
 	if err != nil {
 		core.WriteError(w, http.StatusInternalServerError, "internal_error", "Something went wrong. Please try again.")
 		return
 	}
-	core.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "deleted_count": count})
+	skillsPurged, _ := s.runSkillCleanup(ctx)
+	goalsPurged, _ := s.runGoalCleanup(ctx)
+	core.WriteJSON(w, http.StatusOK, map[string]any{
+		"ok":               true,
+		"deleted_count":    count,
+		"skills_purged":    skillsPurged,
+		"goals_purged":     goalsPurged,
+	})
 }
 
 func (s *Server) CronCleanupExpiredAccounts(w http.ResponseWriter, r *http.Request) {

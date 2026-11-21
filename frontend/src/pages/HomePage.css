@@ -230,7 +230,7 @@
   margin: 0.5rem auto;
 }
 
-/* Track holding all 16 stacked cards in the exact same grid cell */
+/* Track holding all 17 stacked cards in the exact same grid cell */
 .home-carousel-track {
   display: grid;
   grid-template-columns: 1fr;
@@ -292,7 +292,7 @@ button.home-nav-arrow:active,
   stroke-width: 2.6;
 }
 
-/* The Centered Feature Box (All 16 cards stacked to identical size of largest card) */
+/* The Centered Feature Box (All 17 cards stacked to identical size of largest card) */
 .home-feature-box {
   grid-column: 1;
   grid-row: 1;

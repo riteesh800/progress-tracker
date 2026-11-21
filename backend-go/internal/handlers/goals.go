@@ -17,8 +17,48 @@ import (
 
 const goalTrashRetention = 72 * time.Hour
 
+func (s *Server) purgeExpiredGoalsForUser(ctx context.Context, userID uuid.UUID) error {
+	now := time.Now().UTC()
+	rows, err := s.DB.Query(
+		ctx, nil,
+		`SELECT id, purge_at FROM goals WHERE user_id = ? AND deleted_at IS NOT NULL AND purge_at IS NOT NULL`,
+		s.DB.FormatUUID(userID),
+	)
+	if err != nil {
+		return err
+	}
+	var expiredIDs []uuid.UUID
+	for rows.Next() {
+		var rawID string
+		var rawPurge any
+		if err := rows.Scan(&rawID, &rawPurge); err != nil {
+			continue
+		}
+		id, err := database.ParseUUID(rawID)
+		if err != nil {
+			continue
+		}
+		pa, err := database.ParseNullTime(rawPurge)
+		if err != nil || pa == nil {
+			continue
+		}
+		if !now.Before(pa.UTC()) {
+			expiredIDs = append(expiredIDs, id)
+		}
+	}
+	rows.Close()
+
+	for _, gid := range expiredIDs {
+		_ = s.DB.WithTx(ctx, func(tx *sql.Tx) error {
+			return s.PurgeGoalRecord(ctx, tx, gid)
+		})
+	}
+	return nil
+}
+
 func (s *Server) ListGoals(w http.ResponseWriter, r *http.Request, user *models.User) {
 	ctx := r.Context()
+	_ = s.purgeExpiredGoalsForUser(ctx, user.ID)
 	rows, err := s.DB.Query(
 		ctx, nil,
 		`SELECT g.id, g.user_id, g.goal_name, g.deadline_at, g.timezone, g.motivation_line, g.deleted_at, g.purge_at, g.created_at, g.updated_at,
@@ -198,6 +238,7 @@ func (s *Server) DeleteGoal(w http.ResponseWriter, r *http.Request, user *models
 
 func (s *Server) ListDeletedGoals(w http.ResponseWriter, r *http.Request, user *models.User) {
 	ctx := r.Context()
+	_ = s.purgeExpiredGoalsForUser(ctx, user.ID)
 	rows, err := s.DB.Query(
 		ctx, nil,
 		`SELECT g.id, g.user_id, g.goal_name, g.deadline_at, g.timezone, g.motivation_line, g.deleted_at, g.purge_at, g.created_at, g.updated_at,

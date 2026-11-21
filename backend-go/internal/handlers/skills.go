@@ -18,25 +18,79 @@ import (
 const skillTrashRetention = 72 * time.Hour
 
 func (s *Server) purgeSkillRecord(ctx context.Context, q database.Querier, skillID uuid.UUID) error {
+	fSkillID := s.DB.FormatUUID(skillID)
 	if _, err := s.DB.Exec(
 		ctx, q,
 		`UPDATE activity_log SET topic_id = NULL WHERE topic_id IN (SELECT id FROM topics WHERE skill_id = ?)`,
-		s.DB.FormatUUID(skillID),
+		fSkillID,
 	); err != nil {
 		return err
 	}
-	if _, err := s.DB.Exec(ctx, q, `UPDATE activity_log SET skill_id = NULL WHERE skill_id = ?`, s.DB.FormatUUID(skillID)); err != nil {
+	if _, err := s.DB.Exec(ctx, q, `UPDATE activity_log SET skill_id = NULL WHERE skill_id = ?`, fSkillID); err != nil {
 		return err
 	}
-	if _, err := s.DB.Exec(ctx, q, `UPDATE import_jobs SET skill_id = NULL WHERE skill_id = ?`, s.DB.FormatUUID(skillID)); err != nil {
+	if _, err := s.DB.Exec(ctx, q, `UPDATE import_jobs SET skill_id = NULL WHERE skill_id = ?`, fSkillID); err != nil {
 		return err
 	}
-	_, err := s.DB.Exec(ctx, q, `DELETE FROM skills WHERE id = ?`, s.DB.FormatUUID(skillID))
+	if _, err := s.DB.Exec(
+		ctx, q,
+		`DELETE FROM notes WHERE topic_id IN (SELECT id FROM topics WHERE skill_id = ?)`,
+		fSkillID,
+	); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(ctx, q, `DELETE FROM skill_timers WHERE skill_id = ?`, fSkillID); err != nil {
+		return err
+	}
+	if _, err := s.DB.Exec(ctx, q, `DELETE FROM topics WHERE skill_id = ?`, fSkillID); err != nil {
+		return err
+	}
+	_, err := s.DB.Exec(ctx, q, `DELETE FROM skills WHERE id = ?`, fSkillID)
 	return err
+}
+
+func (s *Server) purgeExpiredSkillsForUser(ctx context.Context, userID uuid.UUID) error {
+	now := time.Now().UTC()
+	rows, err := s.DB.Query(
+		ctx, nil,
+		`SELECT id, purge_at FROM skills WHERE user_id = ? AND deleted_at IS NOT NULL AND purge_at IS NOT NULL`,
+		s.DB.FormatUUID(userID),
+	)
+	if err != nil {
+		return err
+	}
+	var expiredIDs []uuid.UUID
+	for rows.Next() {
+		var rawID string
+		var rawPurge any
+		if err := rows.Scan(&rawID, &rawPurge); err != nil {
+			continue
+		}
+		id, err := database.ParseUUID(rawID)
+		if err != nil {
+			continue
+		}
+		pa, err := database.ParseNullTime(rawPurge)
+		if err != nil || pa == nil {
+			continue
+		}
+		if !now.Before(pa.UTC()) {
+			expiredIDs = append(expiredIDs, id)
+		}
+	}
+	rows.Close()
+
+	for _, sid := range expiredIDs {
+		_ = s.DB.WithTx(ctx, func(tx *sql.Tx) error {
+			return s.purgeSkillRecord(ctx, tx, sid)
+		})
+	}
+	return nil
 }
 
 func (s *Server) ListSkills(w http.ResponseWriter, r *http.Request, user *models.User) {
 	ctx := r.Context()
+	_ = s.purgeExpiredSkillsForUser(ctx, user.ID)
 	rows, err := s.DB.Query(
 		ctx, nil,
 		`SELECT `+SkillColumns+` FROM skills WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at ASC`,
@@ -75,6 +129,7 @@ func (s *Server) ListSkills(w http.ResponseWriter, r *http.Request, user *models
 
 func (s *Server) ListDeletedSkills(w http.ResponseWriter, r *http.Request, user *models.User) {
 	ctx := r.Context()
+	_ = s.purgeExpiredSkillsForUser(ctx, user.ID)
 	rows, err := s.DB.Query(
 		ctx, nil,
 		`SELECT `+SkillColumns+` FROM skills WHERE user_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC`,

@@ -288,3 +288,98 @@ func TestTopicsHierarchyProgressAndSkillTimer(t *testing.T) {
 		t.Fatalf("delete timer expected 204, got %d", code)
 	}
 }
+
+func TestAutomaticThreeDayPurgeAndCompleteCascade(t *testing.T) {
+	env := NewTestEnv(t)
+	token, _ := env.RegisterUser("purge_test@example.com", "Password123!", "PurgeUser")
+
+	// 1. Create a skill with a topic, note, and skill timer
+	_, skill, _ := env.DoJSON(http.MethodPost, "/skills", map[string]any{"name": "Skill To Auto Purge"}, AuthHeader(token))
+	skillID := skill["id"].(string)
+
+	_, topic, _ := env.DoJSON(http.MethodPost, "/topics", map[string]any{"skill_id": skillID, "name": "Topic Under Skill"}, AuthHeader(token))
+	topicID := topic["id"].(string)
+
+	_, _, _ = env.DoJSON(http.MethodPost, "/topics/"+topicID+"/notes", map[string]any{"content": "Note content to be purged"}, AuthHeader(token))
+
+	_, _, _ = env.DoJSON(http.MethodPost, "/skills/"+skillID+"/timer", map[string]any{"from_date": "2026-06-01", "to_date": "2026-06-30"}, AuthHeader(token))
+
+	// Soft-delete skill (move to trash)
+	code, _, _ := env.DoJSON(http.MethodDelete, "/skills/"+skillID+"?confirm=true", nil, AuthHeader(token))
+	if code != http.StatusOK {
+		t.Fatalf("delete skill failed: %d", code)
+	}
+
+	// Fast forward purge_at by 3 days (in the past)
+	past := time.Now().UTC().Add(-73 * time.Hour)
+	_, _ = env.DB.Exec(context.Background(), nil, `UPDATE skills SET purge_at = ? WHERE id = ?`, env.DB.FormatTime(past), skillID)
+
+	// User requests trash (or skills list) -> "the very next moment" automatic purge runs
+	code, _, rawTrash := env.DoJSON(http.MethodGet, "/skills/trash", nil, AuthHeader(token))
+	if code != http.StatusOK {
+		t.Fatalf("get trash failed: %d", code)
+	}
+	var trashList []map[string]any
+	_ = json.Unmarshal(rawTrash, &trashList)
+	if len(trashList) != 0 {
+		t.Fatalf("expected trash to be empty after 3-day purge, got %d items", len(trashList))
+	}
+
+	// Verify complete cascading deletion in database
+	var count int
+	_ = env.DB.QueryRow(context.Background(), nil, `SELECT COUNT(*) FROM skills WHERE id = ?`, skillID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("expected skill to be permanently deleted from DB, found %d", count)
+	}
+	_ = env.DB.QueryRow(context.Background(), nil, `SELECT COUNT(*) FROM topics WHERE id = ?`, topicID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("expected topic to be permanently deleted from DB, found %d", count)
+	}
+	_ = env.DB.QueryRow(context.Background(), nil, `SELECT COUNT(*) FROM notes WHERE topic_id = ?`, topicID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("expected note to be permanently deleted from DB, found %d", count)
+	}
+	_ = env.DB.QueryRow(context.Background(), nil, `SELECT COUNT(*) FROM skill_timers WHERE skill_id = ?`, skillID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("expected timer to be permanently deleted from DB, found %d", count)
+	}
+
+	// 2. Test Goal 3-Day Auto Purge
+	_, goal, _ := env.DoJSON(http.MethodPost, "/goals", map[string]any{
+		"goal_name":   "Goal To Auto Purge",
+		"deadline_at": time.Now().UTC().Add(48 * time.Hour).Format(time.RFC3339),
+	}, AuthHeader(token))
+	goalID := goal["id"].(string)
+
+	_, _, _ = env.DoJSON(http.MethodPost, "/goals/"+goalID+"/activities", map[string]any{"activity_text": "Working hard"}, AuthHeader(token))
+
+	// Soft-delete goal
+	code, _, _ = env.DoJSON(http.MethodDelete, "/goals/"+goalID, nil, AuthHeader(token))
+	if code != http.StatusOK {
+		t.Fatalf("delete goal failed: %d", code)
+	}
+
+	// Fast forward purge_at by 3 days
+	_, _ = env.DB.Exec(context.Background(), nil, `UPDATE goals SET purge_at = ? WHERE id = ?`, env.DB.FormatTime(past), goalID)
+
+	// User requests trash -> automatic purge runs immediately
+	code, _, rawGoalTrash := env.DoJSON(http.MethodGet, "/goals/trash", nil, AuthHeader(token))
+	if code != http.StatusOK {
+		t.Fatalf("get goal trash failed: %d", code)
+	}
+	var goalTrashList []map[string]any
+	_ = json.Unmarshal(rawGoalTrash, &goalTrashList)
+	if len(goalTrashList) != 0 {
+		t.Fatalf("expected goal trash to be empty after 3-day purge, got %d items", len(goalTrashList))
+	}
+
+	// Verify database state
+	_ = env.DB.QueryRow(context.Background(), nil, `SELECT COUNT(*) FROM goals WHERE id = ?`, goalID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("expected goal to be permanently deleted from DB, found %d", count)
+	}
+	_ = env.DB.QueryRow(context.Background(), nil, `SELECT COUNT(*) FROM goal_activities WHERE goal_id = ?`, goalID).Scan(&count)
+	if count != 0 {
+		t.Fatalf("expected goal activities to be permanently deleted from DB, found %d", count)
+	}
+}
