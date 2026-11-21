@@ -230,6 +230,16 @@
   margin: 0.5rem auto;
 }
 
+/* Track holding all 16 stacked cards in the exact same grid cell */
+.home-carousel-track {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  width: 100%;
+  max-width: 980px;
+  align-items: stretch;
+}
+
 /* Left & Right Red Arrows (matching user drawing) */
 button.home-nav-arrow,
 .home-nav-arrow {
@@ -246,7 +256,7 @@ button.home-nav-arrow,
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
   z-index: 20;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7), 0 0 16px rgba(239, 68, 68, 0.45);
   user-select: none;
@@ -267,13 +277,13 @@ button.home-nav-arrow:hover,
   background: #2d1317;
   border-color: #f87171;
   color: #ffffff;
-  transform: translateY(-50%) scale(0.94) !important;
+  transform: translateY(-50%) !important;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8), 0 0 18px rgba(239, 68, 68, 0.65);
 }
 
 button.home-nav-arrow:active,
 .home-nav-arrow:active {
-  transform: translateY(-50%) scale(0.88) !important;
+  transform: translateY(-50%) scale(0.92) !important;
 }
 
 .home-nav-arrow svg {
@@ -282,9 +292,12 @@ button.home-nav-arrow:active,
   stroke-width: 2.6;
 }
 
-/* The Centered Feature Box (Exact Size and Placement as drawn) */
+/* The Centered Feature Box (All 16 cards stacked to identical size of largest card) */
 .home-feature-box {
-  flex: 1;
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+  height: 100%;
   max-width: 980px;
   min-height: 490px;
   background: linear-gradient(145deg, #161e27 0%, #11171f 60%, #0d1218 100%);
@@ -298,7 +311,18 @@ button.home-nav-arrow:active,
   justify-content: space-between;
   position: relative;
   overflow: hidden;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: opacity 0.25s ease, visibility 0.25s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.home-feature-box.active {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 2;
 }
 
 .home-feature-box::before {

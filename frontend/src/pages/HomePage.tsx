@@ -799,7 +799,6 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [isAutoPlay, isHovered, nextSlide]);
 
-  const current = features[activeIdx];
 
   return (
     <div className="home-root">
@@ -882,55 +881,68 @@ export default function HomePage() {
             </svg>
           </button>
 
-          {/* Centered Feature Box (Exact Size as drawn in user diagram) */}
-          <article className="home-feature-box" aria-live="polite">
-            <div className="home-feature-grid">
-              {/* Left Column: Feature Info */}
-              <div className="home-feature-info">
-                <div>
-                  <div className="home-feature-top-meta">
-                    <span className="home-feature-badge">
-                      <span>✦</span>
-                      <span>{current.category}</span>
-                    </span>
-                    <span className="home-feature-count">
-                      Feature {String(activeIdx + 1).padStart(2, "0")} / {String(totalFeatures).padStart(2, "0")}
-                    </span>
+          {/* Track containing all 16 stacked feature cards so all cards stay equal size and arrows never jump */}
+          <div className="home-carousel-track">
+            {features.map((feat, idx) => {
+              const isActive = idx === activeIdx;
+              return (
+                <article
+                  key={feat.id}
+                  className={`home-feature-box${isActive ? " active" : ""}`}
+                  aria-hidden={!isActive}
+                  aria-live={isActive ? "polite" : undefined}
+                  inert={!isActive ? true : undefined}
+                >
+                  <div className="home-feature-grid">
+                    {/* Left Column: Feature Info */}
+                    <div className="home-feature-info">
+                      <div>
+                        <div className="home-feature-top-meta">
+                          <span className="home-feature-badge">
+                            <span>✦</span>
+                            <span>{feat.category}</span>
+                          </span>
+                          <span className="home-feature-count">
+                            Feature {String(idx + 1).padStart(2, "0")} / {String(totalFeatures).padStart(2, "0")}
+                          </span>
+                        </div>
+
+                        <h2 className="home-feature-title">{feat.title}</h2>
+                        <p className="home-feature-tagline">{feat.tagline}</p>
+                        <p className="home-feature-desc">{feat.description}</p>
+
+                        <ul className="home-feature-highlights">
+                          {feat.highlights.map((h, i) => (
+                            <li key={i}>
+                              <svg className="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                              <span>{h}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div style={{ marginTop: "1rem" }}>
+                        <Link to={feat.ctaLink} className="home-feature-cta" tabIndex={isActive ? 0 : -1}>
+                          <span>{feat.ctaLabel}</span>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                          </svg>
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Interactive/Visual Component Mockup */}
+                    <div className="home-feature-visual">
+                      {feat.renderVisual()}
+                    </div>
                   </div>
-
-                  <h2 className="home-feature-title">{current.title}</h2>
-                  <p className="home-feature-tagline">{current.tagline}</p>
-                  <p className="home-feature-desc">{current.description}</p>
-
-                  <ul className="home-feature-highlights">
-                    {current.highlights.map((h, i) => (
-                      <li key={i}>
-                        <svg className="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{ marginTop: "1rem" }}>
-                  <Link to={current.ctaLink} className="home-feature-cta">
-                    <span>{current.ctaLabel}</span>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Right Column: Interactive/Visual Component Mockup */}
-              <div className="home-feature-visual">
-                {current.renderVisual()}
-              </div>
-            </div>
-          </article>
+                </article>
+              );
+            })}
+          </div>
 
           {/* Right Red Arrow > (matching user drawing) */}
           <button
