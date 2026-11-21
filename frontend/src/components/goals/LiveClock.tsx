@@ -77,7 +77,7 @@ export function LiveClock({ deadlineAt, onDeadlineReached }: LiveClockProps) {
           </div>
         ))}
 
-        {/* Embedded Countdown Display (Image 2 placed inside Image 3 red circled zone) */}
+        {/* Embedded Countdown Display (Image 2 badges only) */}
         {deadlineAt && (
           <div className="goal-clock-embedded-countdown" aria-live="polite">
             {remaining.isReached ? (
@@ -86,38 +86,38 @@ export function LiveClock({ deadlineAt, onDeadlineReached }: LiveClockProps) {
                 <span className="goal-clock-reached-sub">Target time has elapsed</span>
               </div>
             ) : (
-              <>
-                <div className="goal-clock-countdown-text">
-                  {remaining.formattedText}
-                </div>
-
-                <div className="goal-clock-countdown-badges">
-                  {remaining.years > 0 && (
-                    <span className="goal-clock-unit-badge">
-                      <strong>{remaining.years}</strong>y
-                    </span>
-                  )}
-                  {(remaining.months > 0 || remaining.years > 0) && (
-                    <span className="goal-clock-unit-badge">
-                      <strong>{remaining.months}</strong>m
-                    </span>
-                  )}
-                  {(remaining.days > 0 || remaining.months > 0 || remaining.years > 0) && (
-                    <span className="goal-clock-unit-badge">
-                      <strong>{remaining.days}</strong>d
-                    </span>
-                  )}
+              <div className="goal-clock-countdown-badges">
+                {remaining.years > 0 && (
                   <span className="goal-clock-unit-badge">
-                    <strong>{String(remaining.hours).padStart(2, "0")}</strong>h
+                    <strong>{remaining.years}</strong>
+                    <span className="goal-clock-unit-label">y</span>
                   </span>
+                )}
+                {(remaining.months > 0 || remaining.years > 0) && (
                   <span className="goal-clock-unit-badge">
-                    <strong>{String(remaining.minutes).padStart(2, "0")}</strong>m
+                    <strong>{remaining.months}</strong>
+                    <span className="goal-clock-unit-label">m</span>
                   </span>
+                )}
+                {(remaining.days > 0 || remaining.months > 0 || remaining.years > 0) && (
                   <span className="goal-clock-unit-badge">
-                    <strong>{String(remaining.seconds).padStart(2, "0")}</strong>s
+                    <strong>{remaining.days}</strong>
+                    <span className="goal-clock-unit-label">d</span>
                   </span>
-                </div>
-              </>
+                )}
+                <span className="goal-clock-unit-badge">
+                  <strong>{String(remaining.hours).padStart(2, "0")}</strong>
+                  <span className="goal-clock-unit-label">h</span>
+                </span>
+                <span className="goal-clock-unit-badge">
+                  <strong>{String(remaining.minutes).padStart(2, "0")}</strong>
+                  <span className="goal-clock-unit-label">m</span>
+                </span>
+                <span className="goal-clock-unit-badge">
+                  <strong>{String(remaining.seconds).padStart(2, "0")}</strong>
+                  <span className="goal-clock-unit-label">s</span>
+                </span>
+              </div>
             )}
           </div>
         )}

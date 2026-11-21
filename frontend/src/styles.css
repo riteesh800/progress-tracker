@@ -2787,60 +2787,58 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
 }
 
-/* Embedded Countdown Display in Clock Face (Image 2 placed inside Image 3 red circled zone) */
+/* Embedded Countdown Display in Clock Face (Image 2 badges only) */
 .goal-clock-embedded-countdown {
   position: absolute;
-  top: 57%;
+  top: 64%;
   left: 50%;
   transform: translateX(-50%);
-  width: 86%;
-  max-width: 290px;
+  width: 90%;
+  max-width: 320px;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 0.45rem;
   z-index: 3;
   text-align: center;
   user-select: none;
   pointer-events: auto;
 }
 
-.goal-clock-countdown-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: 0.04em;
-  text-shadow: 0 0 14px rgba(56, 189, 248, 0.5), 0 2px 4px rgba(0, 0, 0, 0.8);
-  line-height: 1.15;
-  white-space: nowrap;
-}
-
 .goal-clock-countdown-badges {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.55rem;
   justify-content: center;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .goal-clock-unit-badge {
-  background: rgba(18, 28, 42, 0.75);
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  padding: 0.22rem 0.52rem;
-  border-radius: 7px;
-  font-size: 0.72rem;
-  color: #94a3b8;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  display: inline-flex;
+  align-items: baseline;
+  background: rgba(14, 22, 34, 0.82);
+  border: 1.5px solid rgba(56, 189, 248, 0.32);
+  padding: 0.45rem 0.65rem;
+  border-radius: 9px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .goal-clock-unit-badge strong {
   color: #ffffff;
-  font-size: 0.92rem;
+  font-size: 1.35rem;
+  font-weight: 800;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  margin-right: 0.12rem;
+  letter-spacing: 0.02em;
+  margin-right: 0.2rem;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+.goal-clock-unit-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #94a3b8;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
 .goal-clock-countdown-reached {
@@ -2937,17 +2935,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     height: 290px;
   }
 
-  .goal-clock-countdown-text {
-    font-size: 1.05rem;
+  .goal-clock-countdown-badges {
+    gap: 0.35rem;
   }
 
   .goal-clock-unit-badge {
-    padding: 0.18rem 0.38rem;
-    font-size: 0.65rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 7px;
   }
 
   .goal-clock-unit-badge strong {
-    font-size: 0.82rem;
+    font-size: 1.05rem;
+  }
+
+  .goal-clock-unit-label {
+    font-size: 0.72rem;
   }
 
   .goal-clock-hand.hour-hand {
