@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 
-interface CountdownTimerProps {
+export interface CountdownTimerProps {
   deadlineAt: string;
   onDeadlineReached?: () => void;
 }
 
-interface TimeRemaining {
+export interface TimeRemaining {
   isReached: boolean;
   years: number;
   months: number;
@@ -16,7 +16,22 @@ interface TimeRemaining {
   formattedText: string;
 }
 
-function calculateRemaining(deadlineIso: string): TimeRemaining {
+export function formatTargetDate(deadlineIso: string): string {
+  const d = new Date(deadlineIso);
+  if (isNaN(d.getTime())) return "";
+  const day = d.getDate();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[d.getMonth()];
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
+}
+
+export function calculateRemaining(deadlineIso: string): TimeRemaining {
   const target = new Date(deadlineIso);
   const now = new Date();
   const diffMs = target.getTime() - now.getTime();

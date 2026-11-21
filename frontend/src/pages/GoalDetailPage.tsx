@@ -8,7 +8,7 @@ import {
   addGoalActivity,
 } from "../api/goals.api";
 import { LiveClock } from "../components/goals/LiveClock";
-import { CountdownTimer } from "../components/goals/CountdownTimer";
+import { formatTargetDate } from "../components/goals/CountdownTimer";
 import { InactivityWarning } from "../components/goals/InactivityWarning";
 import { ActivityCards } from "../components/goals/ActivityCards";
 import { GoalProgressGraph } from "../components/goals/GoalProgressGraph";
@@ -181,24 +181,22 @@ export default function GoalDetailPage() {
 
       {/* Centerpiece: Real Live Working Clock and Countdown Timer */}
       <section className="card goal-time-centerpiece" aria-label="Live Clock and Target Countdown">
-        <div className="goal-time-clock-area">
+        <div className="goal-time-header-wrap">
           <div className="goal-time-section-label">
             <span>Time is running, are you?</span>
           </div>
-          <LiveClock />
+          {goal.deadline_at && (
+            <div className="goal-time-target-pill">
+              <span className="goal-time-target-icon" aria-hidden>⏳</span>
+              <span>Target: {formatTargetDate(goal.deadline_at)}</span>
+            </div>
+          )}
         </div>
 
-        <div className="goal-time-divider" aria-hidden />
-
-        <div className="goal-time-countdown-area">
-          <div className="goal-time-section-label">
-            <span>Countdown to Deadline</span>
-          </div>
-          <CountdownTimer
-            deadlineAt={goal.deadline_at}
-            onDeadlineReached={handleDeadlineReached}
-          />
-        </div>
+        <LiveClock
+          deadlineAt={goal.deadline_at}
+          onDeadlineReached={handleDeadlineReached}
+        />
       </section>
 
       {/* Daily Activity Cards: "What I Did Today" (Section 5) */}
