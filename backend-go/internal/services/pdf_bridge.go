@@ -609,6 +609,20 @@ func AssertPDFTreeBudget(tree map[string]any) error {
 	return nil
 }
 
+type topicToInsert struct {
+	id          uuid.UUID
+	skillID     uuid.UUID
+	parentID    *uuid.UUID
+	name        string
+	description *string
+	orderIndex  int
+}
+
+type queueItem struct {
+	nodes    []map[string]any
+	parentID *uuid.UUID
+}
+
 func PersistTopicNodes(
 	ctx context.Context,
 	db *database.DB,
@@ -617,50 +631,111 @@ func PersistTopicNodes(
 	nodes []map[string]any,
 	parentID *uuid.UUID,
 ) (int, error) {
-	created := 0
+	if len(nodes) == 0 {
+		return 0, nil
+	}
+
+	// Group topics level-by-level so every parent is guaranteed to be inserted
+	// before any of its children, completely satisfying foreign key constraints.
+	var levels [][]topicToInsert
+	currentLevelQueue := []queueItem{{nodes: nodes, parentID: parentID}}
+
+	for len(currentLevelQueue) > 0 {
+		var currentLevelTopics []topicToInsert
+		var nextLevelQueue []queueItem
+
+		for _, item := range currentLevelQueue {
+			for idx, node := range item.nodes {
+				name, _ := node["name"].(string)
+				name = strings.TrimSpace(name)
+				if name == "" {
+					name = "Untitled"
+				}
+				if runes := []rune(name); len(runes) > MaxNameLen {
+					name = string(runes[:MaxNameLen])
+				}
+
+				var descPtr *string
+				if dStr, ok := node["description"].(string); ok && strings.TrimSpace(dStr) != "" {
+					d := strings.TrimSpace(dStr)
+					if runes := []rune(d); len(runes) > 2000 {
+						d = string(runes[:2000])
+					}
+					descPtr = &d
+				}
+
+				topicID := uuid.New()
+				currentLevelTopics = append(currentLevelTopics, topicToInsert{
+					id:          topicID,
+					skillID:     skillID,
+					parentID:    item.parentID,
+					name:        name,
+					description: descPtr,
+					orderIndex:  idx,
+				})
+
+				children := toMapSlice(node["children"])
+				if len(children) > 0 {
+					pid := topicID
+					nextLevelQueue = append(nextLevelQueue, queueItem{
+						nodes:    children,
+						parentID: &pid,
+					})
+				}
+			}
+		}
+
+		if len(currentLevelTopics) > 0 {
+			levels = append(levels, currentLevelTopics)
+		}
+		currentLevelQueue = nextLevelQueue
+	}
+
 	now := time.Now().UTC()
 	nowVal := db.FormatTime(now)
+	created := 0
+	const batchSize = 50
 
-	for idx, node := range nodes {
-		name, _ := node["name"].(string)
-		if strings.TrimSpace(name) == "" {
-			name = "Untitled"
-		}
-		var descPtr *string
-		if dStr, ok := node["description"].(string); ok {
-			descPtr = &dStr
-		}
-		topicID := uuid.New()
-		_, err := db.Exec(ctx, q, `
-			INSERT INTO topics (
-				id, skill_id, parent_id, name, description,
-				order_index, is_completed, completed_at, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
-		`,
-			db.FormatUUID(topicID),
-			db.FormatUUID(skillID),
-			db.FormatNullUUID(parentID),
-			name,
-			descPtr,
-			idx,
-			false,
-			nowVal,
-			nowVal,
-		)
-		if err != nil {
-			return created, err
-		}
-		created++
+	for _, level := range levels {
+		for i := 0; i < len(level); i += batchSize {
+			end := i + batchSize
+			if end > len(level) {
+				end = len(level)
+			}
+			batch := level[i:end]
 
-		children := toMapSlice(node["children"])
-		if len(children) > 0 {
-			pid := topicID
-			subCreated, err := PersistTopicNodes(ctx, db, q, skillID, children, &pid)
-			if err != nil {
+			var query strings.Builder
+			query.WriteString(`
+				INSERT INTO topics (
+					id, skill_id, parent_id, name, description,
+					order_index, is_completed, completed_at, created_at, updated_at
+				) VALUES `)
+
+			args := make([]any, 0, len(batch)*8)
+			for j, t := range batch {
+				if j > 0 {
+					query.WriteString(", ")
+				}
+				query.WriteString("(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)")
+				args = append(args,
+					db.FormatUUID(t.id),
+					db.FormatUUID(t.skillID),
+					db.FormatNullUUID(t.parentID),
+					t.name,
+					t.description,
+					t.orderIndex,
+					false,
+					nowVal,
+					nowVal,
+				)
+			}
+
+			if _, err := db.Exec(ctx, q, query.String(), args...); err != nil {
 				return created, err
 			}
-			created += subCreated
+			created += len(batch)
 		}
 	}
+
 	return created, nil
 }

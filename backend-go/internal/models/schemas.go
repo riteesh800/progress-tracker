@@ -549,8 +549,9 @@ func (t *TreePatchIn) Validate() error {
 }
 
 type ConfirmImportIn struct {
-	SkillName        *string `json:"skill_name"`
-	SkillDescription *string `json:"skill_description"`
+	SkillName         *string        `json:"skill_name"`
+	SkillDescription  *string        `json:"skill_description"`
+	GeneratedTreeJSON map[string]any `json:"generated_tree_json"`
 }
 
 func (c *ConfirmImportIn) Validate() error {

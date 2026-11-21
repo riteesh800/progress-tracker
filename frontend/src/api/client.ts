@@ -131,6 +131,9 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     res = await fetch(`${API_BASE}${path}`, toRequestInit(options, headers, controller.signal));
   } catch {
     wakingCallback?.(false);
+    if (controller.signal.aborted) {
+      throw new ApiError(0, "Request timed out. The server took too long to respond.");
+    }
     throw new ApiError(0, "Could not reach the server. It may be waking up — try again in a moment.");
   } finally {
     window.clearTimeout(wakeTimer);

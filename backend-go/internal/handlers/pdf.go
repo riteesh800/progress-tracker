@@ -609,6 +609,9 @@ func (s *Server) ConfirmJob(w http.ResponseWriter, r *http.Request, user *models
 		return
 	}
 	treeMap := job.GeneratedTreeJSON
+	if body.GeneratedTreeJSON != nil {
+		treeMap = body.GeneratedTreeJSON
+	}
 	if treeMap == nil {
 		treeMap = map[string]any{}
 	}
@@ -698,6 +701,18 @@ func (s *Server) ConfirmJob(w http.ResponseWriter, r *http.Request, user *models
 			s.DB.FormatTime(now),
 		); err != nil {
 			return err
+		}
+		if body.GeneratedTreeJSON != nil {
+			if _, err := s.DB.Exec(
+				ctx, tx,
+				`UPDATE import_jobs SET generated_tree_json = ?, updated_at = ? WHERE id = ?`,
+				MarshalJSONString(tree),
+				s.DB.FormatTime(now),
+				s.DB.FormatUUID(job.ID),
+			); err != nil {
+				return err
+			}
+			job.GeneratedTreeJSON = tree
 		}
 		if _, err := services.PersistTopicNodes(ctx, s.DB, tx, skillID, children, nil); err != nil {
 			return err

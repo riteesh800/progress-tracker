@@ -218,6 +218,7 @@ export default function ImportPage() {
   const [uploading, setUploading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isTreeDirty, setIsTreeDirty] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -270,6 +271,7 @@ export default function ImportPage() {
     setError("");
     try {
       await patchTree(jobId, job.generated_tree_json);
+      setIsTreeDirty(false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not save edits");
       throw e;
@@ -281,10 +283,9 @@ export default function ImportPage() {
     setError("");
     setConfirming(true);
     try {
-      if (job?.generated_tree_json && job.status === "ready_for_preview") {
-        await patchTree(jobId, job.generated_tree_json).catch(() => {});
-      }
-      const done = await confirmJob(jobId, skillName || undefined);
+      const treeToConfirm = isTreeDirty ? job?.generated_tree_json : undefined;
+      const done = await confirmJob(jobId, skillName || undefined, treeToConfirm ?? undefined);
+      setIsTreeDirty(false);
       qc.invalidateQueries({ queryKey: ["skills"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       if (done.skill_id) {
@@ -342,7 +343,10 @@ export default function ImportPage() {
               <input placeholder="Skill name" value={skillName} onChange={(e) => setSkillName(e.target.value)} maxLength={200} />
               <PreviewNode
                 node={tree}
-                onChange={(n) => setJob({ ...job, generated_tree_json: n })}
+                onChange={(n) => {
+                  setJob({ ...job, generated_tree_json: n });
+                  setIsTreeDirty(true);
+                }}
               />
               <div className="import-action-bar" ref={bottomRef}>
                 {error && (

@@ -26,6 +26,14 @@ export function uploadPdf(file: File): Promise<ImportJob> {
 
 export const getJob = (id: string) => api<ImportJob>(`/pdf/jobs/${id}`);
 export const patchTree = (id: string, generated_tree_json: ProposedNode) =>
-  api<ImportJob>(`/pdf/jobs/${id}/tree`, { method: "PATCH", body: JSON.stringify({ generated_tree_json }) });
-export const confirmJob = (id: string, skill_name?: string) =>
-  api<ImportJob>(`/pdf/jobs/${id}/confirm`, { method: "POST", body: JSON.stringify({ skill_name }) });
+  api<ImportJob>(`/pdf/jobs/${id}/tree`, {
+    method: "PATCH",
+    body: JSON.stringify({ generated_tree_json }),
+    timeoutMs: 90000,
+  });
+export const confirmJob = (id: string, skill_name?: string, generated_tree_json?: ProposedNode | null) =>
+  api<ImportJob>(`/pdf/jobs/${id}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ skill_name, generated_tree_json }),
+    timeoutMs: 90000,
+  });
