@@ -6,7 +6,6 @@
 [![Vercel Serverless](https://img.shields.io/badge/Vercel-Serverless-000000?style=flat&logo=vercel)](https://vercel.com)
 [![Supabase Postgres](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat&logo=supabase)](https://supabase.com)
 [![Google Gemini](https://img.shields.io/badge/Google-Gemini%20AI-8E75C2?style=flat&logo=googlegemini)](https://ai.google.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Skill Progress Tracker** is a production-grade, high-performance learning operating system that converts complex syllabi, academic curriculum PDFs, and ambitious study goals into interactive, mathematically tracked mastery roadmaps.
 
@@ -599,9 +598,3 @@ go test -v ./tests/...
 # Run performance benchmarks
 go test -run=NONE -bench="." -benchmem ./tests/...
 ```
-
----
-
-## License
-
-This project is licensed under the MIT License.
